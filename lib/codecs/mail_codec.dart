@@ -24,7 +24,7 @@ abstract class MailCodec {
   static const encodingUtf8 = convert.Utf8Codec(allowMalformed: true);
   static const encodingLatin1 = convert.Latin1Codec(allowInvalid: true);
   static const encodingAscii = convert.AsciiCodec(allowInvalid: true);
-  static final _charsetCodecsByName = <String, convert.Encoding>{
+  static final charsetCodecsByName = <String, convert.Encoding>{
     'utf-8': encodingUtf8,
     'utf8': encodingUtf8,
     'latin-1': encodingLatin1,
@@ -173,7 +173,7 @@ abstract class MailCodec {
           .substring(separatorIndex + 1, separatorIndex + 2)
           .toLowerCase();
 
-      final codec = _charsetCodecsByName[characterEncodingName];
+      final codec = charsetCodecsByName[characterEncodingName];
       if (codec == null) {
         print('Error: no encoding found for [$characterEncodingName].');
         buffer.write(input);
@@ -229,7 +229,7 @@ abstract class MailCodec {
     final transferEncodingLC = transferEncoding?.toLowerCase() ?? '8bit';
     if (transferEncodingLC == '8bit' || transferEncodingLC == '7bit') {
       charset ??= 'utf8';
-      final codec = _charsetCodecsByName[charset.toLowerCase()];
+      final codec = charsetCodecsByName[charset.toLowerCase()];
       if (codec == null) {
         print('Error: no encoding found for charset [$charset].');
         return encodingUtf8.decode(data);
@@ -250,7 +250,7 @@ abstract class MailCodec {
       return text;
     }
     charset ??= 'utf8';
-    final codec = _charsetCodecsByName[charset.toLowerCase()];
+    final codec = charsetCodecsByName[charset.toLowerCase()];
     if (codec == null) {
       print('Error: no encoding found for charset [$charset].');
       return text;
