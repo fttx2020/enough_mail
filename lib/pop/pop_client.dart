@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:enough_convert/enough_convert.dart';
 import 'package:enough_mail/enough_mail.dart';
 import 'package:enough_mail/pop/pop_events.dart';
 import 'package:enough_mail/pop/pop_exception.dart';
@@ -31,6 +32,8 @@ class PopClient extends ClientBase {
   /// ```
   EventBus get eventBus => _eventBus;
   final EventBus _eventBus;
+
+  final GbkDecoder _gbkDecoder = GbkDecoder(allowInvalid: true);
 
   final Uint8ListReader _uint8listReader = Uint8ListReader();
   PopCommand? _currentCommand;
@@ -76,7 +79,11 @@ class PopClient extends ClientBase {
       _currentFirstResponseLine = _uint8listReader.readLine();
       if (_currentFirstResponseLine != null &&
           _currentFirstResponseLine!.startsWith('-ERR')) {
-        onServerResponse([_currentFirstResponseLine]);
+        ///check decoder
+        final _text = _gbkDecoder.convert(data);
+        final _lines = _text.trim().split('\r\n');
+        onServerResponse(_lines);
+        // onServerResponse([_currentFirstResponseLine]);
         return;
       }
     }
