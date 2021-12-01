@@ -9,7 +9,7 @@ Add this dependency your pubspec.yaml file:
 
 ```
 dependencies:
-  enough_mail: ^1.2.0
+  enough_mail: ^1.3.4
 ```
 The latest version or `enough_mail` is [![enough_mail version](https://img.shields.io/pub/v/enough_mail.svg)](https://pub.dartlang.org/packages/enough_mail).
 
@@ -39,6 +39,10 @@ Future<void> mailExample() async {
   print('discovering settings for  $email...');
   final config = await Discover.discover(email);
   if (config == null) {
+    // note that you can also directly create an account when
+    // you cannot autodiscover the settings:
+    // Compare [MailAccount.fromManualSettings] and [MailAccount.fromManualSettingsWithAuth] 
+    // methods for details
     print('Unable to autodiscover settings for $email');
     return;
   }
@@ -212,6 +216,7 @@ Please [follow the instructions](https://github.com/Enough-Software/enough_mail/
 Check out these related projects:
 * [enough_mail_html](https://github.com/Enough-Software/enough_mail_html) generates HTML out of a `MimeMessage`.
 * [enough_mail_flutter](https://github.com/Enough-Software/enough_mail_flutter) provides some common Flutter widgets for any mail app.
+* [enough_mail_icalendar](https://github.com/Enough-Software/enough_mail_icalendar) for handling calendar invites in emails.
 * [enough_mail_app](https://github.com/Enough-Software/enough_mail_app) aims to become a full mail app.
 * [enough_convert](https://github.com/Enough-Software/enough_convert) provides the encodings missing from `dart:convert`.  
 
@@ -273,8 +278,8 @@ Character encodings:
 * UTF-8 (uft8, 8bit)
 * ISO-8859-1 (latin-1)
 * ISO-8859-2 - 16 (latin-2 - 16)
-* Windows-1250, 1251, 1252, 1253 and 1254
-* GB-2312 and GBK
+* Windows-1250, 1251, 1252, 1253, 1254 and 1256
+* GB-2312, GBK, GB-18030, Chinese, CSGB-2312, CSGB-231280, CSISO-58-GB-231280, ISO-IR-58, X-Mac-ChineseSimp
 
 Transfer encodings:
 * [Quoted-Printable (Q)](https://tools.ietf.org/html/rfc2045#section-6.7)

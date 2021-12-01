@@ -1,3 +1,45 @@
+# 1.3.6
+- Fix generating messages with several recipients in `MessageBuilder`. Previously semicolons were used that were not accepted by all mail providers.
+
+# 1.3.5
+- Add `bool Function(X509Certificate)? onBadCertificate` callback to handle invalid certificates #167
+- Stop polling when disconnecting high level `MailClient`
+- Ignore subsequent `IDLE` requests when already in idle mode in `ImapClient`
+- Improve documentation
+
+# 1.3.4
+- Fix some IMAP mailbox commands when there is no mailbox selected: #160 #164 #165
+
+# 1.3.3
+- Add easier method to setup a `MailAccount` with manual settings by calling `MailAccount.fromManualSettings()` 
+  or `MailAccount.fromManualSettingsWithAuth()`. This is useful when settings cannot or should not be auto-discovered, for example.
+
+# 1.3.2
+- Fix login for IMAP servers that do not define capabilities in their `AUTH`/`LOGIN` response #159
+
+# 1.3.1
+- Always quote user name and password in IMAP login, #158
+- Thanks to [fttx2020](https://github.com/fttx2020) we have these great improvements:
+  - Fix for POP3 UID LIST command
+  - Fix parsing of POP3 responses
+  - Handle more Chinese character encodings
+  - Handle some base64 text variations better
+- `SmtpException`s now contain the full error description
+
+# 1.3.0
+- Support read receipts #149
+  - Check if a message contains a read receipt request with `MimeMessage.isReadReceiptRequested`
+  - Generate a read request response with `MessageBuilder.buildReadReceipt()`
+- Support Windows-1256 encoding
+- Add another message as an attachment with `MessageBuilder.addMessagePart()` #153
+- Easily retrieve all leaf parts after loading `BODYSTRUCTURE` with `MimeMessage.body.allLeafParts`
+- Fix for responses with a line break spread around 2 chunks #140
+- Improve identification of message parts with their `fetchId` #141 #143 - Thanks to [A.Zulli](https://github.com/azulli) again!
+- Messages are now send with `utf-8` rather than `utf8` to reduce problems #144 - Thanks to [gmalakov](https://github.com/gmalakov)
+- Fix for responses with a literal `{0}` response #145
+- Better detection of plain text messages thanks to [castaway](https://github.com/castaway)
+
+
 # 1.2.2
 - Assume `8bit` encoding when no `content-transfer-encoding` is specified in a MIME message.
 - Exclude empty address-lists when building a message with `MessageBuilder`.

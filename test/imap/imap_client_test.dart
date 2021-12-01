@@ -1,7 +1,9 @@
+// ignore_for_file: lines_longer_than_80_chars
+
 import 'dart:async';
 
-import 'package:enough_mail/imap/message_sequence.dart';
-import 'package:enough_mail/src/util/client_base.dart';
+import 'package:enough_mail/src/imap/message_sequence.dart';
+import 'package:enough_mail/src/private/util/client_base.dart';
 import 'package:test/test.dart';
 import 'dart:io' show Platform;
 import 'package:event_bus/event_bus.dart';
@@ -31,7 +33,8 @@ void main() {
 
     final connection = MockConnection();
     client.connect(connection.socketClient,
-        connectionInformation: ConnectionInfo('imaptest.enough.de', 993, true));
+        connectionInformation:
+            const ConnectionInfo('imaptest.enough.de', 993, isSecure: true));
     mockServer = MockImapServer.connect(connection.socketServer);
     connection.socketServer.write(
         '* OK [CAPABILITY IMAP4rev1 CHILDREN ENABLE ID IDLE LIST-EXTENDED LIST-STATUS LITERAL- MOVE NAMESPACE QUOTA SASL-IR SORT SPECIAL-USE THREAD=ORDEREDSUBJECT UIDPLUS UNSELECT WITHIN AUTH=LOGIN AUTH=PLAIN] IMAP server ready H mieue154 15.6 IMAP-1My4Ij-1k2Oa32EiF-00yVN8\r\n');
@@ -52,6 +55,41 @@ void main() {
     expect(capResponse[0].name, 'IMAP4rev1');
     expect(capResponse[1].name, 'CHILDREN');
     expect(capResponse[2].name, 'ENABLE');
+  });
+
+  test('ImapClient login without capability', () async {
+    // setup own initial response for test:
+    client = ImapClient(bus: EventBus(sync: true), isLogEnabled: false);
+
+    client.eventBus
+        .on<ImapExpungeEvent>()
+        .listen((e) => expungedMessages.add(e.messageSequenceId));
+    client.eventBus
+        .on<ImapVanishedEvent>()
+        .listen((e) => vanishedMessages = e.vanishedMessages);
+    client.eventBus.on<ImapFetchEvent>().listen((e) => fetchEvents.add(e));
+
+    final connection = MockConnection();
+    client.connect(connection.socketClient,
+        connectionInformation:
+            ConnectionInfo('imap.qq.com', 993, isSecure: true));
+    mockServer = MockImapServer.connect(connection.socketServer);
+    connection.socketServer.write(
+        '* OK [CAPABILITY IMAP4 IMAP4rev1 ID AUTH=PLAIN AUTH=LOGIN AUTH=XOAUTH2 NAMESPACE] QQMail XMIMAP4Server ready\r\n');
+    // allow processing of server greeting:
+    await Future.delayed(const Duration(milliseconds: 15));
+
+    mockServer.response = '<tag> OK LOGIN completed';
+    final capResponse = await client.login('testuser', 'testpassword');
+    expect(capResponse, isNotNull,
+        reason: 'login response does not contain a result');
+    expect(capResponse.isEmpty, true,
+        reason: 'login response should not contain a single capability');
+    expect(capResponse.length, 0);
+    expect(client.serverInfo.capabilities, isNotNull);
+    expect(client.serverInfo.capabilities!.length, 7);
+    expect(client.serverInfo.capabilities![2].name, 'ID');
+    expect(client.serverInfo.capabilities![6].name, 'NAMESPACE');
   });
 
   test('ImapClient authenticateWithOAuth2', () async {
@@ -228,7 +266,8 @@ void main() {
   test('ImapClient search', () async {
     mockServer.response = '* SEARCH 3423 17 3\r\n'
         '<tag> OK SEARCH completed';
-    final searchResponse = await client.searchMessages('UNSEEN');
+    final searchResponse =
+        await client.searchMessages(searchCriteria: 'UNSEEN');
     expect(searchResponse.matchingSequence, isNotNull);
     expect(searchResponse.matchingSequence!.toList(), [3, 17, 3423]);
   });
@@ -236,7 +275,8 @@ void main() {
   test('ImapClient uid search', () async {
     mockServer.response = '* SEARCH 3423 17 3\r\n'
         '<tag> OK UID SEARCH completed';
-    final searchResult = await client.uidSearchMessages('UNSEEN');
+    final searchResult =
+        await client.uidSearchMessages(searchCriteria: 'UNSEEN');
     expect(searchResult.matchingSequence, isNotNull);
     expect(searchResult.matchingSequence!.isNotEmpty, true);
     expect(searchResult.matchingSequence!.toList(), [3, 17, 3423]);
@@ -310,8 +350,13 @@ void main() {
         '* ESEARCH (TAG "<tag>") MIN 2 COUNT 3 ALL ${testSequence.join(',')}\r\n'
         '<tag> OK SEARCH Completed';
 
-    final searchResponse = await client.searchMessages('UNSEEN',
-        [ReturnOption.count(), ReturnOption.min(), ReturnOption.all()]);
+    final searchResponse = await client.searchMessages(
+        searchCriteria: 'UNSEEN',
+        returnOptions: [
+          ReturnOption.count(),
+          ReturnOption.min(),
+          ReturnOption.all()
+        ]);
     expect(searchResponse.isExtended, isTrue);
     expect(searchResponse.count, 3);
     expect(searchResponse.min, 2);
@@ -326,8 +371,13 @@ void main() {
         '* ESEARCH (TAG "<tag>") MIN 2 COUNT 3 UID ALL ${testSequence.join(',')}\r\n'
         '<tag> OK UID SEARCH Completed';
 
-    final searchResponse = await client.uidSearchMessages('UNSEEN',
-        [ReturnOption.count(), ReturnOption.min(), ReturnOption.all()]);
+    final searchResponse = await client.uidSearchMessages(
+        searchCriteria: 'UNSEEN',
+        returnOptions: [
+          ReturnOption.count(),
+          ReturnOption.min(),
+          ReturnOption.all()
+        ]);
     expect(searchResponse.isExtended, isTrue);
     expect(searchResponse.count, 3);
     expect(searchResponse.min, 2);
