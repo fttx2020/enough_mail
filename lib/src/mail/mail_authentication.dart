@@ -1,67 +1,72 @@
-import 'package:enough_mail/src/discover/client_config.dart';
-import 'package:enough_mail/src/imap/imap_client.dart';
-import 'package:enough_mail/src/pop/pop_client.dart';
-import 'package:enough_mail/src/smtp/smtp_client.dart';
 import 'package:enough_serialization/enough_serialization.dart';
+
+import '../discover/client_config.dart';
+import '../exception.dart';
+import '../imap/imap_client.dart';
+import '../pop/pop_client.dart';
+import '../smtp/smtp_client.dart';
 
 /// Contains an authentication for a mail service
 /// Compare [PlainAuthentication] and [OauthAuthentication] for implementations.
 abstract class MailAuthentication extends SerializableObject {
-  static const String _typePlain = 'plain';
-  static const String _typeOauth = 'oauth';
-  String? get typeName => attributes['typeName'];
-  set typeName(String? value) => attributes['typeName'] = value;
-
+  /// Creates a new authentication with the given [typeName]
   MailAuthentication(String typeName) {
     this.typeName = typeName;
   }
 
-  /// Authenticates with the specified mail service
-  Future<void> authenticate(ServerConfig serverConfig,
-      {ImapClient? imap, PopClient? pop, SmtpClient? smtp});
-
-  static MailAuthentication createType(String typeName) {
+  /// Factory to create a new mail authentication depending on the type
+  factory MailAuthentication.createType(String typeName) {
     switch (typeName) {
       case _typePlain:
         return PlainAuthentication(null, null);
       case _typeOauth:
         return OauthAuthentication(null, null);
     }
-    throw StateError('unsupported MailAuthentication type [$typeName]');
+    throw InvalidArgumentException(
+        'unsupported MailAuthentication type [$typeName]');
   }
+
+  static const String _typePlain = 'plain';
+  static const String _typeOauth = 'oauth';
+
+  /// The name of this authentication type, e.g. `plain` or `oauth`
+  String? get typeName => attributes['typeName'];
+  set typeName(String? value) => attributes['typeName'] = value;
+
+  /// Authenticates with the specified mail service
+  Future<void> authenticate(ServerConfig serverConfig,
+      {ImapClient? imap, PopClient? pop, SmtpClient? smtp});
 }
 
 /// Base class for authentications with user-names
 abstract class UserNameBasedAuthentication extends MailAuthentication {
-  /// Gets the user name
-  String get userName => attributes['userName'];
-
-  /// Sets the user name
-  set userName(String value) => attributes['userName'] = value;
-
+  /// Creates a new user name based auth
   UserNameBasedAuthentication(String? userName, String typeName)
       : super(typeName) {
     if (userName != null) {
       this.userName = userName;
     }
   }
+
+  /// The user name
+  String get userName => attributes['userName'];
+  set userName(String value) => attributes['userName'] = value;
 }
 
 /// Provides a simple username-password authentication
 class PlainAuthentication extends UserNameBasedAuthentication {
-  /// gets the password
-  String get password => attributes['password'];
-
-  /// sets the password
-  set password(String value) => attributes['password'] = value;
-
-  /// Creates a new plain authentication with the given [userName] and [password].
+  /// Creates a new plain authentication
+  /// with the given [userName] and [password].
   PlainAuthentication(String? userName, String? password)
       : super(userName, MailAuthentication._typePlain) {
     if (password != null) {
       this.password = password;
     }
   }
+
+  /// The password
+  String get password => attributes['password'];
+  set password(String value) => attributes['password'] = value;
 
   @override
   Future<void> authenticate(ServerConfig serverConfig,
@@ -84,72 +89,23 @@ class PlainAuthentication extends UserNameBasedAuthentication {
         await smtp.authenticate(name, pwd, authMechanism);
         break;
       default:
-        throw StateError('Unknown server type ${serverConfig.typeName}');
+        throw InvalidArgumentException(
+            'Unknown server type ${serverConfig.typeName}');
     }
   }
 
   @override
-  bool operator ==(o) =>
-      o is PlainAuthentication &&
-      o.userName == userName &&
-      o.password == password;
+  bool operator ==(Object other) =>
+      other is PlainAuthentication &&
+      other.userName == userName &&
+      other.password == password;
+
+  @override
+  int get hashCode => userName.hashCode | password.hashCode;
 }
 
 /// Contains an OAuth compliant token
 class OauthToken extends SerializableObject {
-  /// Gets the token for API access
-  String get accessToken => attributes['access_token'];
-
-  /// Sets the token for API access
-  set accessToken(String value) => attributes['access_token'] = value;
-
-  /// Gets the expiration in seconds from [created] time
-  int get expiresIn => attributes['expires_in'];
-
-  /// Sets the expiration in seconds from [created] time
-  set expiresIn(int value) => attributes['expires_in'] = value;
-
-  /// Gets the token for refreshing the [accessToken]
-  String get refreshToken => attributes['refresh_token'];
-
-  /// Sets the token for refreshing the [accessToken]
-  set refreshToken(String value) => attributes['refresh_token'] = value;
-
-  /// Gets the granted scope(s) for access
-  String get scope => attributes['scope'];
-
-  /// Sets the granted scope(s) for access
-  set scope(String value) => attributes['scope'] = value;
-
-  /// Gets the token type
-  String get tokenType => attributes['token_type'];
-
-  /// Sets the token type
-  set tokenType(String value) => attributes['token_type'] = value;
-
-  /// Gets the UTC time of creation of this token
-  DateTime get created =>
-      DateTime.fromMillisecondsSinceEpoch(attributes['created'], isUtc: true);
-
-  /// Sets the UTC time of creation of this token
-  set created(DateTime value) =>
-      attributes['created'] = value.millisecondsSinceEpoch;
-
-  /// Gets the optional, implementation-specific provider
-  String? get provider => attributes['provider'];
-
-  /// Sets the optional, implementation-specific provider
-  set provider(String? value) => attributes['provider'] = value;
-
-  /// Checks if this token is expired
-  bool get isExpired => expiresDateTime.isBefore(DateTime.now().toUtc());
-
-  /// Retrieves the expiry date time
-  DateTime get expiresDateTime => created.add(Duration(seconds: expiresIn));
-
-  /// Checks if this token is still valid, ie not expired
-  bool get isValid => !isExpired;
-
   /// Creates a new token
   OauthToken({
     String? accessToken,
@@ -180,38 +136,74 @@ class OauthToken extends SerializableObject {
     }
   }
 
-  /// Refreshes this token with the new [accessToken] and [expiresIn].
-  OauthToken copyWith(String accessToken, int expiresIn) {
-    return OauthToken(
-      accessToken: accessToken,
-      expiresIn: expiresIn,
-      refreshToken: refreshToken,
-      scope: scope,
-      tokenType: tokenType,
-      provider: provider,
-    );
+  /// Parses a new token from the given [text].
+  OauthToken.fromText(String text, {String? provider}) {
+    Serializer().deserialize(text, this);
+    if (attributes['created'] == null) {
+      created = DateTime.now().toUtc();
+    }
+    if (provider != null) {
+      this.provider = provider;
+    }
   }
+
+  /// Token for API access
+  String get accessToken => attributes['access_token'];
+  set accessToken(String value) => attributes['access_token'] = value;
+
+  /// Expiration in seconds from [created] time
+  int get expiresIn => attributes['expires_in'];
+  set expiresIn(int value) => attributes['expires_in'] = value;
+
+  /// Token for refreshing the [accessToken]
+  String get refreshToken => attributes['refresh_token'];
+  set refreshToken(String value) => attributes['refresh_token'] = value;
+
+  /// Granted scope(s) for access
+  String get scope => attributes['scope'];
+  set scope(String value) => attributes['scope'] = value;
+
+  /// Type of the token
+  String get tokenType => attributes['token_type'];
+  set tokenType(String value) => attributes['token_type'] = value;
+
+  /// UTC time of creation of this token
+  DateTime get created =>
+      DateTime.fromMillisecondsSinceEpoch(attributes['created'] ?? 0,
+          isUtc: true);
+  set created(DateTime value) =>
+      attributes['created'] = value.millisecondsSinceEpoch;
+
+  /// Optional, implementation-specific provider
+  String? get provider => attributes['provider'];
+  set provider(String? value) => attributes['provider'] = value;
+
+  /// Checks if this token is expired
+  bool get isExpired => expiresDateTime.isBefore(DateTime.now().toUtc());
+
+  /// Retrieves the expiry date time
+  DateTime get expiresDateTime => created.add(Duration(seconds: expiresIn));
+
+  /// Checks if this token is still valid, ie not expired
+  bool get isValid => !isExpired;
+
+  /// Refreshes this token with the new [accessToken] and [expiresIn].
+  OauthToken copyWith(String accessToken, int expiresIn) => OauthToken(
+        accessToken: accessToken,
+        expiresIn: expiresIn,
+        refreshToken: refreshToken,
+        scope: scope,
+        tokenType: tokenType,
+        provider: provider,
+      );
 
   @override
-  String toString() {
-    return Serializer().serialize(this);
-  }
-
-  static OauthToken fromText(String text, {String? provider}) {
-    final token = OauthToken();
-    Serializer().deserialize(text, token);
-    if (provider != null) {
-      token.provider = provider;
-    }
-    return token;
-  }
+  String toString() => Serializer().serialize(this);
 }
 
 /// Provides an OAuth-compliant authentication
 class OauthAuthentication extends UserNameBasedAuthentication {
-  OauthToken get token => attributes['token'];
-  set token(OauthToken value) => attributes['token'] = value;
-
+  /// Creates a new authentication
   OauthAuthentication(String? userName, OauthToken? token)
       : super(userName, MailAuthentication._typeOauth) {
     if (token != null) {
@@ -219,6 +211,24 @@ class OauthAuthentication extends UserNameBasedAuthentication {
     }
     objectCreators['token'] = (map) => OauthToken();
   }
+
+  /// Creates an OauthAuthentication from the given [userName]
+  /// and [oauthTokenText] in JSON.
+  ///
+  /// Optionally specify the [provider] for identifying tokens later.
+  OauthAuthentication.from(String userName, String oauthTokenText,
+      {String? provider})
+      : super(userName, MailAuthentication._typeOauth) {
+    final token = OauthToken.fromText(oauthTokenText);
+    if (provider != null) {
+      token.provider = provider;
+    }
+    this.token = token;
+  }
+
+  /// Token for the access
+  OauthToken get token => attributes['token'];
+  set token(OauthToken value) => attributes['token'] = value;
 
   @override
   Future<void> authenticate(ServerConfig serverConfig,
@@ -237,25 +247,17 @@ class OauthAuthentication extends UserNameBasedAuthentication {
         await smtp!.authenticate(name, accessToken, AuthMechanism.xoauth2);
         break;
       default:
-        throw StateError('Unknown server type ${serverConfig.typeName}');
+        throw InvalidArgumentException(
+            'Unknown server type ${serverConfig.typeName}');
     }
   }
 
   @override
-  bool operator ==(o) =>
-      o is OauthAuthentication &&
-      o.userName == userName &&
-      o.token.accessToken == token.accessToken;
+  bool operator ==(Object other) =>
+      other is OauthAuthentication &&
+      other.userName == userName &&
+      other.token.accessToken == token.accessToken;
 
-  /// Creates an OauthAuthentication from the given [userName] and [oauthTokenText] in JSON.
-  ///
-  /// Optionally specify the [provider] for identifying tokens later.
-  static OauthAuthentication from(String userName, String oauthTokenText,
-      {String? provider}) {
-    final token = OauthToken.fromText(oauthTokenText);
-    if (provider != null) {
-      token.provider = provider;
-    }
-    return OauthAuthentication(userName, token);
-  }
+  @override
+  int get hashCode => userName.hashCode | token.hashCode;
 }
