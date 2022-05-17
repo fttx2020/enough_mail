@@ -1,16 +1,16 @@
-import 'package:enough_mail/enough_mail.dart';
+import '../../enough_mail.dart';
 
 /// Status for command responses.
 enum ResponseStatus {
   /// The response completed successfully
-  OK,
+  ok,
 
   /// The command is not supported
-  No,
+  no,
 
   /// The command is supported but the client send a wrong request
   /// or is a wrong state
-  Bad
+  bad
 }
 
 /// Base class for command responses.
@@ -18,14 +18,14 @@ class Response<T> {
   /// The status, either OK or Failed
   ResponseStatus? status;
 
-  /// The textual reponse details
+  /// The textual response details
   String? details;
 
   /// The result of the operation
   T? result;
 
-  /// Returns `true` when the reponse status is OK
-  bool get isOkStatus => status == ResponseStatus.OK;
+  /// Returns `true` when the response status is OK
+  bool get isOkStatus => status == ResponseStatus.ok;
 
   /// Returns `true` when the response status is not ok
   bool get isFailedStatus => !isOkStatus;
@@ -93,6 +93,26 @@ class FetchImapResult {
 
   /// The requested messages
   final List<MimeMessage> messages;
+
+  /// Replaces matching messages
+  void replaceMatchingMessages(List<MimeMessage> messages) {
+    for (final mime in messages) {
+      final uid = mime.uid;
+      final sequenceId = mime.sequenceId;
+      if (uid != null) {
+        final index = messages.indexWhere((msg) => msg.uid == uid);
+        if (index != -1) {
+          messages[index] = mime;
+        }
+      } else if (sequenceId != null) {
+        final index =
+            messages.indexWhere((msg) => msg.sequenceId == sequenceId);
+        if (index != -1) {
+          messages[index] = mime;
+        }
+      }
+    }
+  }
 }
 
 /// Result for STORE and UID STORE operations

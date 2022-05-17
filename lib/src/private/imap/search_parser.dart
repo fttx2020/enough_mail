@@ -1,29 +1,43 @@
-import 'package:enough_mail/src/imap/message_sequence.dart';
-import 'package:enough_mail/src/imap/response.dart';
-import 'package:enough_mail/src/private/imap/response_parser.dart';
-
+import '../../imap/message_sequence.dart';
+import '../../imap/response.dart';
 import 'imap_response.dart';
+import 'response_parser.dart';
 
 /// Parses search responses
 class SearchParser extends ResponseParser<SearchImapResult> {
+  /// Creates a new search parser
+  SearchParser({required this.isUidSearch, this.isExtended = false});
+
+  /// Is this a UID-based search?
   final bool isUidSearch;
-  var ids = <int>[];
+
+  /// The IDs
+  List<int> ids = <int>[];
+
+  /// The highest modification sequence
   int? highestModSequence;
 
+  /// Is an extended response expected?
   final bool isExtended;
-  // Reference tag for the current extended search untagged response
+
+  /// Reference tag for the current extended search untagged response
   String? tag;
+
+  /// minimum search ID
   int? min;
+
+  /// maximum search ID
   int? max;
+
+  /// number of search results
   int? count;
 
+  /// Partial range
   String? partialRange;
-
-  SearchParser(this.isUidSearch, [this.isExtended = false]);
 
   @override
   SearchImapResult? parse(
-      ImapResponse details, Response<SearchImapResult> response) {
+      ImapResponse imapResponse, Response<SearchImapResult> response) {
     if (response.isOkStatus) {
       final result = SearchImapResult()
         // Force the sorting of the resulting sequence set

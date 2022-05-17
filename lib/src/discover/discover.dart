@@ -1,5 +1,5 @@
-import 'package:enough_mail/src/mail/mail_account.dart';
-import 'package:enough_mail/src/private/util/discover_helper.dart';
+import '../mail/mail_account.dart';
+import '../private/util/discover_helper.dart';
 
 import 'client_config.dart';
 
@@ -11,13 +11,15 @@ class Discover {
 
   /// Tries to discover mail settings for the specified [emailAddress].
   ///
-  /// Optionally set [forceSslConnection] to `true` when unencrypted
+  /// Optionally set [forceSslConnection] to `true` when not encrypted
   /// connections should not be allowed.
+  ///
   /// Set [isLogEnabled] to `true` to output debugging information during
   /// the discovery process.
+  ///
   /// You can use the discovered client settings directly or by converting
   /// them to a [MailAccount] first with calling
-  ///  `MailAccount.fromDiscoveredSettings()`.
+  /// [MailAccount.fromDiscoveredSettings].
   static Future<ClientConfig?> discover(String emailAddress,
       {bool forceSslConnection = false, bool isLogEnabled = false}) async {
     final config = await _discover(emailAddress, isLogEnabled);
@@ -65,18 +67,19 @@ class Discover {
     if (incoming!.port == null ||
         incoming.socketType == null ||
         incoming.type == null) {
-      DiscoverHelper.addIncomingVariations(incoming.hostname, infos);
+      DiscoverHelper.addIncomingVariations(incoming.hostname!, infos);
     }
     if (outgoing!.port == null ||
         outgoing.socketType == null ||
         outgoing.type == null) {
-      DiscoverHelper.addOutgoingVariations(outgoing.hostname, infos);
+      DiscoverHelper.addOutgoingVariations(outgoing.hostname!, infos);
     }
     if (infos.isNotEmpty) {
       final baseDomain =
           DiscoverHelper.getDomainFromEmail(partialAccount.email!);
       final clientConfig = await DiscoverHelper.discoverFromConnections(
-          baseDomain, infos, isLogEnabled);
+          baseDomain, infos,
+          isLogEnabled: isLogEnabled);
       if (clientConfig == null) {
         _log('Unable to discover remaining settings from $partialAccount',
             isLogEnabled);
@@ -92,33 +95,38 @@ class Discover {
 
   static Future<ClientConfig?> _discover(
       String emailAddress, bool isLogEnabled) async {
-    // [1] autodiscover from sub-domain, compare: https://developer.mozilla.org/en-US/docs/Mozilla/Thunderbird/Autoconfiguration
+    // [1] auto-discover from sub-domain,
+    // compare: https://developer.mozilla.org/en-US/docs/Mozilla/Thunderbird/Autoconfiguration
     final emailDomain = DiscoverHelper.getDomainFromEmail(emailAddress);
     var config = await DiscoverHelper.discoverFromAutoConfigSubdomain(
-        emailAddress, emailDomain, isLogEnabled);
+        emailAddress,
+        domain: emailDomain,
+        isLogEnabled: isLogEnabled);
     if (config == null) {
       final mxDomain = await DiscoverHelper.discoverMxDomain(emailDomain);
       _log('mxDomain for [$emailDomain] is [$mxDomain]', isLogEnabled);
       if (mxDomain != null && mxDomain != emailDomain) {
         config = await DiscoverHelper.discoverFromAutoConfigSubdomain(
-            emailAddress, mxDomain, isLogEnabled);
+            emailAddress,
+            domain: mxDomain,
+            isLogEnabled: isLogEnabled);
       }
       //print('querying ISP DB for $mxDomain');
 
-      // [5] autodiscover from Mozilla ISP DB:
+      // [5] auto-discover from Mozilla ISP DB:
       // https://developer.mozilla.org/en-US/docs/Mozilla/Thunderbird/Autoconfiguration
       final hasMxDomain = mxDomain != null && mxDomain != emailDomain;
-      config ??=
-          await DiscoverHelper.discoverFromIspDb(emailDomain, isLogEnabled);
+      config ??= await DiscoverHelper.discoverFromIspDb(emailDomain,
+          isLogEnabled: isLogEnabled);
       if (hasMxDomain) {
-        config ??=
-            await DiscoverHelper.discoverFromIspDb(mxDomain, isLogEnabled);
+        config ??= await DiscoverHelper.discoverFromIspDb(mxDomain,
+            isLogEnabled: isLogEnabled);
       }
 
       // try to guess incoming and outgoing server names based on the domain
-      final domains = hasMxDomain ? [emailDomain, mxDomain] : [emailDomain];
-      config ??=
-          await DiscoverHelper.discoverFromCommonDomains(domains, isLogEnabled);
+      final domains = hasMxDomain ? [emailDomain, mxDomain!] : [emailDomain];
+      config ??= await DiscoverHelper.discoverFromCommonDomains(domains,
+          isLogEnabled: isLogEnabled);
     }
     //print('got config $config for $mxDomain.');
     return _updateDisplayNames(config, emailDomain);

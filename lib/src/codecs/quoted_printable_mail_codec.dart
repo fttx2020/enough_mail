@@ -1,16 +1,15 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:enough_mail/src/mail_conventions.dart';
-import 'package:enough_mail/src/private/util/ascii_runes.dart';
-
+import '../mail_conventions.dart';
+import '../private/util/ascii_runes.dart';
 import 'mail_codec.dart';
 
 /// Provides quoted printable encoder and decoder.
 ///
 /// Compare https://tools.ietf.org/html/rfc2045#page-19 for details.
 class QuotedPrintableMailCodec extends MailCodec {
-  /// Creates a new quoted pribtable codec
+  /// Creates a new quoted printable codec
   const QuotedPrintableMailCodec();
 
   /// Encodes the specified text in quoted printable format.
@@ -93,14 +92,14 @@ class QuotedPrintableMailCodec extends MailCodec {
       // TODO Set the correct encoding
       const qpWordHead = '=?utf8?Q?';
       const qpWordTail = '?=';
-      const qpWordDelimSize = qpWordHead.length + qpWordTail.length;
+      const qpWordDelimiterSize = qpWordHead.length + qpWordTail.length;
       if (fromStart) {
         startIndex = 0;
         endIndex = text.length - 1;
       }
       // Available space for the current encoded word
       var qpWordSize = MailConventions.encodedWordMaxLength -
-          qpWordDelimSize -
+          qpWordDelimiterSize -
           startIndex -
           (nameLength + 2);
       // Counts the characters of the current encoded word
@@ -131,7 +130,7 @@ class QuotedPrintableMailCodec extends MailCodec {
             isWordSplit = false;
             // Calculates the new encoded word size
             qpWordSize =
-                MailConventions.encodedWordMaxLength - qpWordDelimSize - 1;
+                MailConventions.encodedWordMaxLength - qpWordDelimiterSize - 1;
           }
           buffer.write(qpWordHead);
         }
@@ -204,7 +203,7 @@ class QuotedPrintableMailCodec extends MailCodec {
             final decoded = codec.decode(charCodes);
             buffer.write(decoded);
           } on FormatException catch (err) {
-            print('unable to decode quptedPrintable buffer: ${err.message}');
+            print('unable to decode quotedPrintable buffer: ${err.message}');
             buffer.write(String.fromCharCodes(charCodes));
           }
         }

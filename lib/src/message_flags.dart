@@ -1,5 +1,8 @@
 /// Contains common message flags
 class MessageFlags {
+  /// Do not allow instantiation
+  MessageFlags._();
+
   /// The message has been read by the user
   static const String seen = r'\Seen';
 
@@ -15,12 +18,18 @@ class MessageFlags {
   /// The message is a draft and not yet complete.
   static const String draft = r'\Draft';
 
-  /// The message has been forwarded - note this is a common but not standardized keyword.
+  /// The message has been forwarded
+  ///
+  ///  - note this is a common but not standardized keyword.
   static const String keywordForwarded = r'$Forwarded';
 
-  /// For this message a read notification has been sent - note this is a common but not standardized keyword.
+  /// For this message a read notification has been sent
+  ///
+  ///  - note this is a common but not standardized keyword.
   static const String keywordMdnSent = r'$MDNSent';
 
-  /// Marks this message as being recent. This flag cannot be changed by clients.
+  /// Marks this message as being recent.
+  ///
+  /// This flag cannot be changed or set by clients.
   static const String recent = r'\Recent';
 }

@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 
 import '../mock_socket.dart';
 import 'mock_smtp_server.dart';
+// cSpell:disable
 
 late SmtpClient client;
 bool _isLogEnabled = false;
@@ -30,8 +31,8 @@ void main() {
     client.connect(connection.socketClient,
         connectionInformation:
             const ConnectionInfo('dummy.domain.com', 587, isSecure: true));
-    _mockServer = MockSmtpServer.connect(
-        connection.socketServer, _smtpUser, _smtpPassword);
+    _mockServer =
+        MockSmtpServer(connection.socketServer, _smtpUser, _smtpPassword);
     _mockServer.writeln('220 domain.com ESMTP Postfix');
 
     //   capResponse = await client.login("testuser", "testpassword");
@@ -105,11 +106,11 @@ void main() {
 
   test('SmtpClient with exception', () async {
     try {
-      final response = await client.sendCommand(DummySmtpCommand('example'));
+      final response =
+          await client.sendCommand(DummySmtpCommand('example', client));
       fail('sendCommand should throw. (but got: $response)');
-      // ignore: avoid_catches_without_on_clauses
     } catch (e) {
-      expect(e, isA<DummySmtpCommand>());
+      expect(e, isA<SmtpException>());
     }
   });
 }
@@ -121,10 +122,11 @@ void _log(String text) {
 }
 
 class DummySmtpCommand extends SmtpCommand {
-  DummySmtpCommand(String command) : super(command);
+  DummySmtpCommand(String command, this.client) : super(command);
+  final SmtpClient client;
   @override
   String nextCommand(SmtpResponse response) {
     // ignore: only_throw_errors
-    throw this;
+    throw SmtpException(client, response);
   }
 }

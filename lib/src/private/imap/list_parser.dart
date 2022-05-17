@@ -1,210 +1,213 @@
-import 'package:enough_mail/src/imap/extended_data.dart';
-import 'package:enough_mail/src/imap/imap_client.dart';
-import 'package:enough_mail/src/imap/mailbox.dart';
-import 'package:enough_mail/src/imap/response.dart';
-import 'package:enough_mail/src/private/imap/response_parser.dart';
-import 'package:enough_mail/src/private/imap/status_parser.dart';
-
+import '../../imap/extended_data.dart';
+import '../../imap/imap_client.dart';
+import '../../imap/mailbox.dart';
+import '../../imap/response.dart';
 import 'imap_response.dart';
+import 'response_parser.dart';
+import 'status_parser.dart';
 
-/// Pareses LIST and LSUB respones
+/// Parses `LIST` and `LSUB` responses
 class ListParser extends ResponseParser<List<Mailbox>> {
-  final ImapServerInfo info;
-  final List<Mailbox> boxes = <Mailbox>[];
-  late String startSequence;
-  final bool isExtended;
-  bool _hasReturnOptions = false;
-
+  /// Creates a new parser
   ListParser(this.info,
       {bool isLsubParser = false,
       this.isExtended = false,
-      bool hasReturnOptions = false}) {
-    startSequence = isLsubParser ? 'LSUB ' : 'LIST ';
-    // Return options are available only for LIST responses.
-    _hasReturnOptions = !isLsubParser && hasReturnOptions;
-  }
+      bool hasReturnOptions = false})
+      : startSequence = isLsubParser ? 'LSUB ' : 'LIST ',
+        // Return options are available only for LIST responses.
+        _hasReturnOptions = !isLsubParser && hasReturnOptions;
+
+  /// The remote service info
+  final ImapServerInfo info;
+
+  /// The resulting mailboxes
+  final List<Mailbox> boxes = <Mailbox>[];
+
+  /// The command's start sequence
+  final String startSequence;
+
+  /// Is an extended response expected?
+  ///
+  /// e.g. when hasSelectionOptions || hasMailboxPatterns || hasReturnOptions
+  final bool isExtended;
+  final bool _hasReturnOptions;
 
   @override
   List<Mailbox>? parse(
-      ImapResponse? details, Response<List<Mailbox>> response) {
-    return response.isOkStatus ? boxes : null;
-  }
+          ImapResponse? imapResponse, Response<List<Mailbox>> response) =>
+      response.isOkStatus ? boxes : null;
 
   @override
   bool parseUntagged(
       ImapResponse imapResponse, Response<List<Mailbox>>? response) {
-    var details = imapResponse.parseText;
-    if (details.startsWith(startSequence)) {
-      var box = Mailbox();
-      var listDetails = details.substring(startSequence.length);
-      var flagsStartIndex = listDetails.indexOf('(');
-      var flagsEndIndex = listDetails.indexOf(')');
+    final parseText = imapResponse.parseText;
+    if (parseText.startsWith(startSequence)) {
+      final boxFlags = <MailboxFlag>[];
+      var listDetails = parseText.substring(startSequence.length);
+      final flagsStartIndex = listDetails.indexOf('(');
+      final flagsEndIndex = listDetails.indexOf(')');
       if (flagsStartIndex != -1 && flagsStartIndex < flagsEndIndex) {
         if (flagsStartIndex < flagsEndIndex - 1) {
           // there are actually flags, not an empty ()
-          var flagsText = listDetails
+          final flagsText = listDetails
               .substring(flagsStartIndex + 1, flagsEndIndex)
               .toLowerCase();
-          var flagNames = flagsText.split(' ');
-          for (var flagName in flagNames) {
+          final flagNames = flagsText.split(' ');
+          for (final flagName in flagNames) {
             switch (flagName) {
               case r'\hasnochildren':
-                box.flags.add(MailboxFlag.hasNoChildren);
+                boxFlags.add(MailboxFlag.hasNoChildren);
                 break;
               case r'\haschildren':
-                box.flags.add(MailboxFlag.hasChildren);
-                box.hasChildren = true;
+                boxFlags.add(MailboxFlag.hasChildren);
                 break;
               case r'\unmarked':
-                box.flags.add(MailboxFlag.unMarked);
+                boxFlags.add(MailboxFlag.unMarked);
                 break;
               case r'\marked':
-                box.flags.add(MailboxFlag.marked);
-                box.isMarked = true;
+                boxFlags.add(MailboxFlag.marked);
                 break;
               case r'\noselect':
-                box.flags.add(MailboxFlag.noSelect);
-                box.isUnselectable = true;
+                boxFlags.add(MailboxFlag.noSelect);
                 break;
               case r'\select':
-                box.flags.add(MailboxFlag.select);
-                box.isSelected = true;
+                boxFlags.add(MailboxFlag.select);
                 break;
               case r'\noinferiors':
-                box.flags.add(MailboxFlag.noInferior);
+                boxFlags.add(MailboxFlag.noInferior);
                 if (isExtended) {
-                  box.flags.add(MailboxFlag.hasNoChildren);
+                  boxFlags.add(MailboxFlag.hasNoChildren);
                 }
                 break;
               case r'\nonexistent':
-                box.flags.add(MailboxFlag.nonExistent);
+                boxFlags.add(MailboxFlag.nonExistent);
                 if (isExtended) {
-                  box.flags.add(MailboxFlag.noSelect);
+                  boxFlags.add(MailboxFlag.noSelect);
                 }
                 break;
               case r'\subscribed':
-                box.flags.add(MailboxFlag.subscribed);
+                boxFlags.add(MailboxFlag.subscribed);
                 break;
               case r'\remote':
-                box.flags.add(MailboxFlag.remote);
+                boxFlags.add(MailboxFlag.remote);
                 break;
               case r'\all':
-                box.flags.add(MailboxFlag.all);
+                boxFlags.add(MailboxFlag.all);
                 break;
               case r'\inbox':
-                box.flags.add(MailboxFlag.inbox);
+                boxFlags.add(MailboxFlag.inbox);
                 break;
               case r'\sent':
-                box.flags.add(MailboxFlag.sent);
+                boxFlags.add(MailboxFlag.sent);
                 break;
               case r'\drafts':
-                box.flags.add(MailboxFlag.drafts);
+                boxFlags.add(MailboxFlag.drafts);
                 break;
               case r'\junk':
-                box.flags.add(MailboxFlag.junk);
+                boxFlags.add(MailboxFlag.junk);
                 break;
               case r'\trash':
-                box.flags.add(MailboxFlag.trash);
+                boxFlags.add(MailboxFlag.trash);
                 break;
               case r'\archive':
-                box.flags.add(MailboxFlag.archive);
+                boxFlags.add(MailboxFlag.archive);
                 break;
               case r'\flagged':
-                box.flags.add(MailboxFlag.flagged);
+                boxFlags.add(MailboxFlag.flagged);
                 break;
               // X-List flags:
               case r'\allmail':
-                box.flags.add(MailboxFlag.all);
+                boxFlags.add(MailboxFlag.all);
                 break;
               case r'\important':
-                box.flags.add(MailboxFlag.flagged);
+                boxFlags.add(MailboxFlag.flagged);
                 break;
               case r'\spam':
-                box.flags.add(MailboxFlag.junk);
+                boxFlags.add(MailboxFlag.junk);
                 break;
               case r'\starred':
-                box.flags.add(MailboxFlag.flagged);
+                boxFlags.add(MailboxFlag.flagged);
                 break;
 
               default:
-                print('enountered unexpected flag: [$flagName]');
+                print('encountered unexpected flag: [$flagName]');
             }
           }
         }
         listDetails = listDetails.substring(flagsEndIndex + 2);
       }
       // Parses extended data
+      final boxExtendedData = <String, List<String>>{};
       if (isExtended) {
-        var extraInfoStartIndex = listDetails.indexOf('(');
-        var extraInfoEndIndex = listDetails.lastIndexOf(')');
+        final extraInfoStartIndex = listDetails.indexOf('(');
+        final extraInfoEndIndex = listDetails.lastIndexOf(')');
         if (extraInfoEndIndex != -1 &&
             extraInfoStartIndex < extraInfoEndIndex) {
-          var extraInfo =
+          final extraInfo =
               listDetails.substring(extraInfoStartIndex + 1, extraInfoEndIndex);
           listDetails = listDetails.substring(0, extraInfoStartIndex - 1);
           // Convert to loop if more extended data results will be present
-          // FIXME Address when multiple extended data list are returned by non conforming servers
-          //while (extraInfo.isNotEmpty) {
-          if (extraInfo.startsWith('${ExtendedData.childinfo}') ||
+          //todo Address when multiple extended data list are returned
+          // by non conforming servers while (extraInfo.isNotEmpty)
+          if (extraInfo.startsWith(ExtendedData.childinfo) ||
               extraInfo.startsWith('"${ExtendedData.childinfo}"')) {
-            if (!box.extendedData.containsKey(ExtendedData.childinfo)) {
-              box.extendedData[ExtendedData.childinfo] = [];
+            final childInfo = boxExtendedData[ExtendedData.childinfo] ?? [];
+            if (!boxExtendedData.containsKey(ExtendedData.childinfo)) {
+              boxExtendedData[ExtendedData.childinfo] = childInfo;
             }
-            var optsStartIndex = extraInfo.indexOf('(');
-            var optsEndIndex = extraInfo.indexOf(')');
+            final optsStartIndex = extraInfo.indexOf('(');
+            final optsEndIndex = extraInfo.indexOf(')');
             if (optsStartIndex != -1 && optsStartIndex < optsEndIndex) {
-              var opts = extraInfo
+              final opts = extraInfo
                   .substring(optsStartIndex + 1, optsEndIndex)
                   .split(' ')
                   .map((e) => e.substring(1, e.length - 1));
-              box.extendedData[ExtendedData.childinfo]!.addAll(opts);
+              childInfo.addAll(opts);
             }
-            /* if (optsEndIndex + 1 == extraInfo.length) {
-              break;
-            }
-            extraInfo = extraInfo.substring(optsEndIndex + 2); */
           }
-          // }
         }
       }
       if (listDetails.startsWith('"')) {
-        var endOfPathSeparatorIndex = listDetails.indexOf('"', 1);
+        final endOfPathSeparatorIndex = listDetails.indexOf('"', 1);
         if (endOfPathSeparatorIndex != -1) {
           final separator = listDetails.substring(1, endOfPathSeparatorIndex);
           info.pathSeparator = separator;
-          //print("path-separator: " + info.pathSeparator);
-          box.pathSeparator = separator;
           listDetails = listDetails.substring(endOfPathSeparatorIndex + 2);
         }
       }
       if (listDetails.startsWith('"')) {
         listDetails = listDetails.substring(1, listDetails.length - 1);
       }
-      box.path = listDetails;
-      if (listDetails.toUpperCase() == 'INBOX' && !box.isInbox) {
-        box.flags.add(MailboxFlag.inbox);
-      }
+      final boxPath = listDetails;
       // Maybe was requested only the hierarchy separator without reference name
-      if (listDetails.isNotEmpty) {
-        var lastPathSeparatorIndex = listDetails.lastIndexOf(
+      if (listDetails.length > 2 && info.pathSeparator != null) {
+        final lastPathSeparatorIndex = listDetails.lastIndexOf(
             info.pathSeparator!, listDetails.length - 2);
         if (lastPathSeparatorIndex != -1) {
           listDetails = listDetails.substring(lastPathSeparatorIndex + 1);
         }
       }
-      box.name = listDetails;
+      final boxName = listDetails;
+      final box = Mailbox(
+        encodedName: boxName,
+        encodedPath: boxPath,
+        flags: boxFlags,
+        pathSeparator: info.pathSeparator ?? '/',
+        extendedData: boxExtendedData,
+      );
       boxes.add(box);
       return true;
     } else if (_hasReturnOptions) {
-      if (details.startsWith('NO')) {
+      if (parseText.startsWith('NO')) {
         // Swallows failed STATUS result
         // This is a special case in which a STATUS result fails with 'NO' for a
         // non existent folder. Nevertheless, the mailbox is added with a \Nonexistent flag.
         return true;
       }
-      if (details.startsWith('STATUS')) {
+      if (parseText.startsWith('STATUS')) {
         // Reuses the StatusParser class
         final parser = StatusParser(boxes.last);
+        // ignore: cascade_invocations
         parser.parseUntagged(imapResponse, null);
         return true;
       }

@@ -1,35 +1,35 @@
-import 'package:enough_mail/src/imap/mailbox.dart';
-import 'package:enough_mail/src/imap/response.dart';
-import 'package:enough_mail/src/private/imap/response_parser.dart';
-
+import '../../imap/mailbox.dart';
+import '../../imap/response.dart';
 import 'imap_response.dart';
+import 'response_parser.dart';
 
 /// Parses status responses
 class StatusParser extends ResponseParser<Mailbox> {
-  Mailbox box;
-
+  /// Creates a new parser
   StatusParser(this.box);
 
+  /// The current mailbox
+  Mailbox box;
+
   @override
-  Mailbox? parse(ImapResponse details, Response<Mailbox> response) {
-    return response.isOkStatus ? box : null;
-  }
+  Mailbox? parse(ImapResponse imapResponse, Response<Mailbox> response) =>
+      response.isOkStatus ? box : null;
 
   @override
   bool parseUntagged(ImapResponse imapResponse, Response<Mailbox>? response) {
-    var details = imapResponse.parseText;
+    final details = imapResponse.parseText;
     if (details.startsWith('STATUS ')) {
-      var startIndex = details.indexOf('(');
+      final startIndex = details.indexOf('(');
       if (startIndex == -1) {
         return false;
       }
-      var listEntries = parseListEntries(details, startIndex + 1, ')');
+      final listEntries = parseListEntries(details, startIndex + 1, ')');
       if (listEntries == null) {
         return false;
       }
       for (var i = 0; i < listEntries.length; i += 2) {
-        var entry = listEntries[i];
-        var value = int.parse(listEntries[i + 1]);
+        final entry = listEntries[i];
+        final value = int.parse(listEntries[i + 1]);
         switch (entry) {
           case 'MESSAGES':
             box.messagesExists = value;
@@ -47,12 +47,8 @@ class StatusParser extends ResponseParser<Mailbox> {
             box.messagesUnseen = value;
             break;
           default:
-            print('unexpected STATUS: ' +
-                entry +
-                '=' +
-                listEntries[i + 1] +
-                '\nin ' +
-                details);
+            print(
+                'unexpected STATUS: $entry=${listEntries[i + 1]}\nin $details');
         }
       }
       return true;

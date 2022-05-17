@@ -1,7 +1,8 @@
 import 'dart:convert';
 
-import 'package:enough_mail/enough_mail.dart';
-import 'package:enough_mail/src/codecs/date_codec.dart';
+import '../codecs/date_codec.dart';
+import '../exception.dart';
+import 'message_sequence.dart';
 
 /// Which part of the message should be searched
 enum SearchQueryType {
@@ -270,7 +271,7 @@ class SearchTermBefore extends _DateSearchTerm {
 }
 
 /// Searches in the body of messages.
-/// This is usally a long lasting operation.
+/// This is usually a long lasting operation.
 class SearchTermBody extends _TextSearchTerm {
   /// Creates a new search term
   SearchTermBody(String match) : super('BODY', match);
@@ -357,7 +358,7 @@ class SearchTermOr extends SearchTerm {
       : super(_merge(term1, term2));
   static String _merge(SearchTerm term1, SearchTerm term2) {
     if (term1 is SearchTermOr || term2 is SearchTermOr) {
-      throw StateError('You cannot nest several OR search terms');
+      throw InvalidArgumentException('You cannot nest several OR search terms');
     }
     return 'OR ${term1.term} ${term2.term}';
   }
@@ -387,7 +388,7 @@ class SearchTermSentOn extends _DateSearchTerm {
   SearchTermSentOn(DateTime dateTime) : super('SENTON', dateTime);
 }
 
-/// Searches message sent after the given timme
+/// Searches message sent after the given time
 class SearchTermSentSince extends _DateSearchTerm {
   /// Creates a new search term
   SearchTermSentSince(DateTime dateTime) : super('SENTSINCE', dateTime);

@@ -1,6 +1,7 @@
 import 'dart:collection';
 
-import 'package:enough_mail/enough_mail.dart';
+import '../exception.dart';
+import '../mime_message.dart';
 
 /// Defines a list of message IDs.
 ///
@@ -67,6 +68,9 @@ class MessageSequence {
 
   /// Convenience method for getting the sequence for a single range from
   /// [start] to the last message inclusive.
+  ///
+  /// Note that the last message will always be returned, even when
+  /// the sequence ID / UID of the last message is smaller than [start].
   MessageSequence.fromRangeToLast(int start, {this.isUidSequence = false}) {
     addRangeToLast(start);
   }
@@ -81,7 +85,7 @@ class MessageSequence {
     addAll();
   }
 
-  /// Generates a sequence based on the specified inpput [text]
+  /// Generates a sequence based on the specified input [text]
   /// like `1:10,21,73:79`.
   ///
   /// Set [isUidSequence] to `true` in case this sequence consists of UIDs.
@@ -103,17 +107,18 @@ class MessageSequence {
           if (id != null) {
             addRangeToLast(id);
           } else {
-            throw StateError('expect id in $idText for <$chunk> in $text');
+            throw InvalidArgumentException(
+                'expect id in $idText for <$chunk> in $text');
           }
         } else {
           final colonIndex = chunk.indexOf(':');
           if (colonIndex == -1) {
-            throw StateError('expect colon in  <$chunk> / $text');
+            throw InvalidArgumentException('expect colon in  <$chunk> / $text');
           }
           final start = int.tryParse(chunk.substring(0, colonIndex));
           final end = int.tryParse(chunk.substring(colonIndex + 1));
           if (start == null || end == null) {
-            throw StateError('expect range in  <$chunk> / $text');
+            throw InvalidArgumentException('expect range in  <$chunk> / $text');
           }
           addRange(start, end);
         }
@@ -122,19 +127,18 @@ class MessageSequence {
   }
 
   /// Convenience method for getting the sequence for a range defined by the
-  /// [page] starting with 1, the [pageSize] and the number
+  /// [page] starting with `1`, the [pageSize] and the number
   /// of messages [messagesExist].
-  // ignore: prefer_constructors_over_static_methods
-  static MessageSequence fromPage(int page, int pageSize, int messagesExist,
+  factory MessageSequence.fromPage(int page, int pageSize, int messagesExist,
       {bool isUidSequence = false}) {
-    final rangeStart = messagesExist - page * pageSize;
+    final rangeStart = messagesExist - page * pageSize + 1;
 
     if (page == 1) {
       // ensure that also get any new messages:
       return MessageSequence.fromRangeToLast(rangeStart < 1 ? 1 : rangeStart,
           isUidSequence: isUidSequence);
     }
-    final rangeEnd = rangeStart + pageSize;
+    final rangeEnd = rangeStart + pageSize - 1;
     return MessageSequence.fromRange(rangeStart < 1 ? 1 : rangeStart, rangeEnd,
         isUidSequence: isUidSequence);
   }
@@ -188,7 +192,7 @@ class MessageSequence {
   void addSequenceId(MimeMessage message) {
     final id = message.sequenceId;
     if (id == null) {
-      throw StateError('no sequence ID found in message');
+      throw InvalidArgumentException('no sequence ID found in message');
     }
     add(id);
   }
@@ -197,7 +201,7 @@ class MessageSequence {
   void removeSequenceId(MimeMessage message) {
     final id = message.sequenceId;
     if (id == null) {
-      throw StateError('no sequence ID found in message');
+      throw InvalidArgumentException('no sequence ID found in message');
     }
     remove(id);
   }
@@ -206,16 +210,16 @@ class MessageSequence {
   void addUid(MimeMessage message) {
     final uid = message.uid;
     if (uid == null) {
-      throw StateError('no UID found in message');
+      throw InvalidArgumentException('no UID found in message');
     }
     add(uid);
   }
 
-  /// Remoces the UID of the specified [message].
+  /// Removes the UID of the specified [message].
   void removeUid(MimeMessage message) {
     final uid = message.uid;
     if (uid == null) {
-      throw StateError('no UID found in message');
+      throw InvalidArgumentException('no UID found in message');
     }
     remove(uid);
   }
@@ -252,7 +256,7 @@ class MessageSequence {
   /// to the last `*` element.
   void addRangeToLast(int start) {
     if (start == 0) {
-      throw StateError('sequence ID must not be 0');
+      throw InvalidArgumentException('sequence ID must not be 0');
     }
     // start:*
     final wasEmpty = isEmpty;
@@ -340,38 +344,38 @@ class MessageSequence {
   /// the last element '*'.
   List<int> toList([int? exists]) {
     if (exists == null && containsLast()) {
-      throw StateError(
+      throw InvalidArgumentException(
           'Unable to list sequence when * is part of the list and the '
           '\'exists\' parameter is not specified.');
     }
     if (_isNilSequence) {
-      throw StateError('Unable to list non existent sequence.');
+      throw InvalidArgumentException('Unable to list non existent sequence.');
     }
-    final idset = LinkedHashSet<int>.identity();
+    final idSet = LinkedHashSet<int>.identity();
     if (_isAllAdded) {
       for (var i = 1; i <= exists!; i++) {
-        idset.add(i);
+        idSet.add(i);
       }
     } else {
       var index = 0;
-      var zeroloc = _ids.indexOf(_elementRangeStar, index);
-      while (zeroloc > 0) {
-        idset
-          ..addAll(_ids.sublist(index, zeroloc))
+      var zeroLoc = _ids.indexOf(_elementRangeStar, index);
+      while (zeroLoc > 0) {
+        idSet
+          ..addAll(_ids.sublist(index, zeroLoc))
           // Using a for-loop because we must generate a sequence when
           //reaching the `STAR` value
-          ..addAll([for (var x = idset.last + 1; x <= exists!; x++) x]);
-        index = zeroloc + 1;
-        zeroloc = _ids.indexOf(_elementRangeStar, index);
+          ..addAll([for (var x = idSet.last + 1; x <= exists!; x++) x]);
+        index = zeroLoc + 1;
+        zeroLoc = _ids.indexOf(_elementRangeStar, index);
       }
-      if (index >= 0 && zeroloc == -1) {
-        idset.addAll(_ids.sublist(index));
+      if (index >= 0 && zeroLoc == -1) {
+        idSet.addAll(_ids.sublist(index));
       }
     }
-    if (idset.remove(_elementStar) && exists != null) {
-      idset.add(exists);
+    if (idSet.remove(_elementStar) && exists != null) {
+      idSet.add(exists);
     }
-    return idset.toList();
+    return idSet.toList();
   }
 
   @override
@@ -395,7 +399,7 @@ class MessageSequence {
       return;
     }
     if (isEmpty) {
-      throw StateError('no ID added to sequence');
+      throw InvalidArgumentException('no ID added to sequence');
     }
     if (_ids.length == 1) {
       buffer.write(_ids[0]);
@@ -489,8 +493,9 @@ class SequenceNode {
   /// UID sequence.
   ///
   /// Root nodes can occur anywhere in a nested sequence node unless it has
-  /// been flatttened.
-  /// Compare `flatten(int depth)`
+  /// been flattened.
+  ///
+  /// Compare [flatten]
   SequenceNode.root({required this.isUid}) : id = -1;
 
   /// Children of this node
@@ -565,7 +570,7 @@ class SequenceNode {
   ///
   /// When the [depth] is `1`, then only the direct children are allowed,
   /// if it has higher, there can be additional
-  /// descendents. [depth] must not be lower than `1`. [depth] defaults to `2`.
+  /// descendants. [depth] must not be lower than `1`. [depth] defaults to `2`.
   SequenceNode flatten({int depth = 2}) {
     assert(depth >= 1, 'depth must be at least 1 ($depth is invalid)');
     final root = SequenceNode.root(isUid: isUid);
@@ -695,9 +700,29 @@ class PagedMessageSequence {
     _messageSequenceIds.add(id);
   }
 
+  /// Inserts the given [id] to this paged sequence
+  void insert(int id) {
+    _addedIds++;
+    sequence.add(id);
+    _messageSequenceIds.insert(0, id);
+  }
+
   /// Removes the given [id] from this paged sequence
   void remove(int id) {
     _messageSequenceIds.remove(id);
     sequence.remove(id);
   }
+
+  /// Retrieves the page index for the given ID
+  int pageIndexOf(int index) => index ~/ pageSize;
+
+  /// Retrieves the sequence for the specified page index
+  MessageSequence getSequence(int pageIndex) =>
+      sequence.subsequenceFromPage(pageIndex + 1, pageSize, skip: _addedIds);
+}
+
+/// Allows to get a sequence for a list of [MimeMessage]s easily
+extension SequenceExtension on List<MimeMessage> {
+  /// Retrieves a message sequence from this list of [MimeMessage]s
+  MessageSequence toSequence() => MessageSequence.fromMessages(this);
 }

@@ -1,4 +1,4 @@
-import 'package:enough_mail/enough_mail.dart';
+import '../../enough_mail.dart';
 
 /// Classification of IMAP events
 ///
@@ -35,7 +35,7 @@ enum ImapEventType {
 /// Base class for any event that can be fired by the `IMAP` client at any time.
 /// Compare [ImapClient.eventBus]
 class ImapEvent {
-  /// Createts a new instance
+  /// Creates a new instance
   ImapEvent(this.eventType, this.imapClient);
 
   /// The type of the event.
@@ -52,7 +52,7 @@ class ImapExpungeEvent extends ImapEvent {
       : super(ImapEventType.expunge, imapClient);
 
   /// The message sequence id (index) of the message that has been removed.
-  final int? messageSequenceId;
+  final int messageSequenceId;
 }
 
 /// Notifies about a sequence of messages that have been deleted.

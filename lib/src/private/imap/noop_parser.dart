@@ -1,35 +1,40 @@
-import 'package:enough_mail/src/imap/imap_client.dart';
-import 'package:enough_mail/src/imap/imap_events.dart';
-import 'package:enough_mail/src/imap/mailbox.dart';
-import 'package:enough_mail/src/imap/message_sequence.dart';
-import 'package:enough_mail/src/imap/response.dart';
-import 'package:enough_mail/src/private/imap/all_parsers.dart';
-import 'package:enough_mail/src/private/imap/parser_helper.dart';
-import 'package:enough_mail/src/private/imap/response_parser.dart';
-
+import '../../imap/imap_client.dart';
+import '../../imap/imap_events.dart';
+import '../../imap/mailbox.dart';
+import '../../imap/message_sequence.dart';
+import '../../imap/response.dart';
+import 'all_parsers.dart';
 import 'imap_response.dart';
+import 'parser_helper.dart';
+import 'response_parser.dart';
 
+/// Parses responses to a NOOP (no operation) IMAP request
 class NoopParser extends ResponseParser<Mailbox?> {
-  final ImapClient imapClient;
-  final Mailbox? mailbox;
-  final FetchParser _fetchParser = FetchParser(false);
-  final Response<FetchImapResult> _fetchResponse = Response<FetchImapResult>();
-
+  /// Create a new parser
   NoopParser(this.imapClient, this.mailbox);
 
+  /// The imap client initiating the request
+  final ImapClient imapClient;
+
+  /// The associated mailbox
+  final Mailbox? mailbox;
+
+  final FetchParser _fetchParser = FetchParser(isUidFetch: false);
+  final Response<FetchImapResult> _fetchResponse = Response<FetchImapResult>();
+
   @override
-  Mailbox? parse(ImapResponse details, Response<Mailbox?> response) {
+  Mailbox? parse(ImapResponse imapResponse, Response<Mailbox?> response) {
     final box = mailbox;
     if (box != null) {
-      box.isReadWrite = details.parseText.startsWith('OK [READ-WRITE]');
+      box.isReadWrite = imapResponse.parseText.startsWith('OK [READ-WRITE]');
       final highestModSequenceIndex =
-          details.parseText.indexOf('[HIGHESTMODSEQ ');
+          imapResponse.parseText.indexOf('[HIGHESTMODSEQ ');
       if (highestModSequenceIndex != -1) {
-        box.highestModSequence = ParserHelper.parseInt(details.parseText,
+        box.highestModSequence = ParserHelper.parseInt(imapResponse.parseText,
             highestModSequenceIndex + '[HIGHESTMODSEQ '.length, ']');
       }
     }
-    return response.isOkStatus ? mailbox : null;
+    return response.isOkStatus ? box : null;
   }
 
   @override
@@ -38,7 +43,9 @@ class NoopParser extends ResponseParser<Mailbox?> {
     if (details.endsWith(' EXPUNGE')) {
       // example: 1234 EXPUNGE
       final id = parseInt(details, 0, ' ');
-      imapClient.eventBus.fire(ImapExpungeEvent(id, imapClient));
+      if (id != null) {
+        imapClient.eventBus.fire(ImapExpungeEvent(id, imapClient));
+      }
     } else if (details.startsWith('VANISHED (EARLIER) ')) {
       handledVanished(details, 'VANISHED (EARLIER) ', isEarlier: true);
     } else if (details.startsWith('VANISHED ')) {
@@ -50,8 +57,8 @@ class NoopParser extends ResponseParser<Mailbox?> {
         handled = super.parseUntagged(imapResponse, response);
       } else {
         final messagesExists = box.messagesExists;
-        final messagesRecent = box.messagesRecent ?? 0;
-        handled = SelectParser.parseUntaggedHelper(mailbox, imapResponse);
+        final messagesRecent = box.messagesRecent;
+        handled = SelectParser.parseUntaggedResponse(box, imapResponse);
 
         if (handled) {
           if (box.messagesExists != messagesExists) {
@@ -59,7 +66,7 @@ class NoopParser extends ResponseParser<Mailbox?> {
                 box.messagesExists, messagesExists, imapClient));
           } else if (box.messagesRecent != messagesRecent) {
             imapClient.eventBus.fire(ImapMessagesRecentEvent(
-                box.messagesRecent ?? 1, messagesRecent, imapClient));
+                box.messagesRecent, messagesRecent, imapClient));
           }
           return true;
         } else {

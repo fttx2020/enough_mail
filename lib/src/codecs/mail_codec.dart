@@ -2,15 +2,15 @@ import 'dart:convert' as convert;
 import 'dart:typed_data';
 
 import 'package:enough_convert/enough_convert.dart';
-import 'package:enough_mail/src/mail_conventions.dart';
-import 'package:enough_mail/src/private/util/ascii_runes.dart';
 
+import '../mail_conventions.dart';
+import '../private/util/ascii_runes.dart';
 import 'base64_mail_codec.dart';
 import 'quoted_printable_mail_codec.dart';
 
 /// The used header encoding mechanism
 enum HeaderEncoding {
-  /// Q encoding simular to QuotedPrintable
+  /// Q encoding similar to QuotedPrintable
   Q,
 
   /// Base64 encoding
@@ -21,6 +21,7 @@ enum HeaderEncoding {
 }
 
 /// Encodes and decodes base-64 and quoted printable encoded texts
+///
 /// Compare https://tools.ietf.org/html/rfc2045#page-19
 /// and https://tools.ietf.org/html/rfc2045#page-23 for details
 abstract class MailCodec {
@@ -149,7 +150,7 @@ abstract class MailCodec {
   String decodeText(String part, convert.Encoding codec,
       {bool isHeader = false});
 
-  /// Descodes the given header [input] value.
+  /// Decodes the given header [input] value.
   static String? decodeHeader(final String? input) {
     if (input == null || input.isEmpty) {
       return input;
@@ -158,9 +159,12 @@ abstract class MailCodec {
     var cleaned = input.replaceAll('\r\n ', '');
     // remove any spaces between 2 encoded words:
     final containsEncodedWordsWithSpace = cleaned.contains('?= =?');
+    final containsEncodedWordsWithTab = cleaned.contains('?=\t=?');
     final containsEncodedWordsWithoutSpace =
         !containsEncodedWordsWithSpace && cleaned.contains('?==?');
-    if (containsEncodedWordsWithSpace || containsEncodedWordsWithoutSpace) {
+    if (containsEncodedWordsWithSpace ||
+        containsEncodedWordsWithTab ||
+        containsEncodedWordsWithoutSpace) {
       final match = _headerEncodingExpression.firstMatch(cleaned);
       if (match != null) {
         final sequence = match.group(0)!;
@@ -169,7 +173,9 @@ abstract class MailCodec {
         final startSequence = sequence.substring(0, endIndex);
         final searchText = containsEncodedWordsWithSpace
             ? '?= $startSequence'
-            : '?=$startSequence';
+            : containsEncodedWordsWithTab
+                ? '?=\t$startSequence'
+                : '?=$startSequence';
         if (startSequence.endsWith('?B?')) {
           // in base64 encoding there are 2 cases:
           // 1. individual parts can end  with the padding character "=":
@@ -180,6 +186,8 @@ abstract class MailCodec {
           if (cleaned.contains('=$searchText')) {
             if (containsEncodedWordsWithSpace) {
               cleaned = cleaned.replaceAll('?= =?', '?==?');
+            } else if (containsEncodedWordsWithTab) {
+              cleaned = cleaned.replaceAll('?=\t=?', '?==?');
             }
           } else {
             cleaned = cleaned.replaceAll(searchText, '');
@@ -278,7 +286,7 @@ abstract class MailCodec {
     }
     // there is actually just one interesting case:
     // when the transfer encoding is 8bit, the text needs to be decoded with
-    // the specifed charset.
+    // the specified charset.
     // Note that some mail senders also declare 7bit message encoding even when
     // UTF8 or other 8bit encodings are used.
     // In other cases the text is ASCII and the 'normal' decodeAnyText method
