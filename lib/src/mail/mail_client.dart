@@ -275,7 +275,7 @@ class MailClient {
     _isConnected = true;
   }
 
-  Future _prepareConnect() async {
+  Future<void> _prepareConnect() async {
     final refresh = _refreshOAuthToken;
     if (refresh != null) {
       final auth = account.incoming?.authentication;
@@ -313,14 +313,14 @@ class MailClient {
   /// Disconnects from the mail service.
   ///
   /// Also compare [connect].
-  Future disconnect() async {
+  Future<void> disconnect() async {
     final futures = <Future>[
       stopPollingIfNeeded(),
       _incomingMailClient.disconnect(),
       _outgoingMailClient.disconnect(),
     ];
     _isConnected = false;
-    return Future.wait(futures);
+    await Future.wait(futures);
   }
 
   /// Enforces to reconnect with the service.
@@ -409,6 +409,7 @@ class MailClient {
   }
 
   /// Retrieves the mailbox with the specified [flag] from the provided [boxes].
+  ///
   /// When no boxes are given, then the `MailClient.mailboxes` are used.
   Mailbox? getMailbox(MailboxFlag flag, [List<Mailbox>? boxes]) {
     boxes ??= mailboxes;
@@ -420,6 +421,7 @@ class MailClient {
   ///
   /// Set [keepRemaining] to `false` (defaults to `true`) to only return the
   /// mailboxes specified by the [order] [MailboxFlag]s.
+  ///
   /// Set [sortRemainingAlphabetically] to `false` (defaults to `true`) to
   /// sort the remaining boxes by name,
   /// is only relevant when [keepRemaining] is `true`.
@@ -447,6 +449,7 @@ class MailClient {
   ///
   /// Optionally specify if `CONDSTORE` support should be enabled
   /// with [enableCondStore].
+  ///
   /// Optionally specify quick resync parameters with [qresync].
   Future<Mailbox> selectMailboxByPath(String path,
       {bool enableCondStore = false, QResyncParameters? qresync}) async {
@@ -466,6 +469,7 @@ class MailClient {
   ///
   /// Optionally specify if `CONDSTORE` support should be enabled
   /// with [enableCondStore].
+  ///
   /// Optionally specify quick resync parameters with [qresync].
   Future<Mailbox> selectMailboxByFlag(MailboxFlag flag,
       {bool enableCondStore = false, QResyncParameters? qresync}) async {
@@ -485,6 +489,7 @@ class MailClient {
   ///
   /// Optionally specify if `CONDSTORE` support should be enabled
   /// with [enableCondStore] - for IMAP servers that support CONDSTORE only.
+  ///
   /// Optionally specify quick resync parameters with [qresync] -
   /// for IMAP servers that support `QRESYNC` only.
   Future<Mailbox> selectInbox(
@@ -505,6 +510,7 @@ class MailClient {
   ///
   /// Optionally specify if CONDSTORE support should be
   /// enabled with [enableCondStore].
+  ///
   /// Optionally specify quick resync parameters with [qresync].
   Future<Mailbox> selectMailbox(Mailbox mailbox,
       {bool enableCondStore = false, QResyncParameters? qresync}) async {
@@ -519,21 +525,25 @@ class MailClient {
   ///
   /// Specify [page] number - by default this is 1, so the first
   /// page is downloaded.
+  ///
   /// Optionally specify the [mailbox] in case none has been selected before
   /// or if another mailbox/folder should be queried.
+  ///
   /// Optionally specify the [fetchPreference] to define the preferred
   /// downloaded scope, defaults to `FetchPreference.fullWhenWithinSize`.
   /// By default  messages that are within the size bounds as defined in the
-  /// `downloadSizeLimit`
-  /// in the `MailClient`s constructor are downloaded fully.
+  /// `downloadSizeLimit` in the `MailClient`s constructor are downloaded fully.
+  ///
   /// Note that the preference cannot be realized on some backends such as
   /// POP3 mail servers.
-  Future<List<MimeMessage>> fetchMessages(
-      {Mailbox? mailbox,
-      int count = 20,
-      int page = 1,
-      FetchPreference fetchPreference =
-          FetchPreference.fullWhenWithinSize}) async {
+  ///
+  /// Compare [fetchMessagesNextPage]
+  Future<List<MimeMessage>> fetchMessages({
+    Mailbox? mailbox,
+    int count = 20,
+    int page = 1,
+    FetchPreference fetchPreference = FetchPreference.fullWhenWithinSize,
+  }) async {
     mailbox ??= _selectedMailbox;
     if (mailbox == null) {
       throw InvalidArgumentException(
@@ -542,27 +552,34 @@ class MailClient {
     if (mailbox != _selectedMailbox) {
       await selectMailbox(mailbox);
     }
-    return _incomingMailClient.fetchMessages(
-        mailbox: mailbox,
-        count: count,
-        page: page,
-        fetchPreference: fetchPreference);
+    final sequence =
+        MessageSequence.fromPage(page, count, mailbox.messagesExists);
+    return _incomingMailClient.fetchMessageSequence(
+      sequence,
+      fetchPreference: fetchPreference,
+    );
   }
 
   /// Loads the specified [sequence] of messages.
   ///
   /// Optionally specify the [mailbox] in case none has been selected before
   /// or if another mailbox/folder should be queried.
+  ///
   /// Optionally specify the [fetchPreference] to define the preferred
   /// downloaded scope, defaults to `FetchPreference.fullWhenWithinSize`.
+  ///
   /// Set [markAsSeen] to `true` to automatically add the `\Seen` flag in case
   /// it is not there yet when downloading the `fetchPreference.full`.
   /// Note that the preference cannot be realized on some backends such as
   /// POP3 mail servers.
-  Future<List<MimeMessage>> fetchMessageSequence(MessageSequence sequence,
-      {Mailbox? mailbox,
-      FetchPreference fetchPreference = FetchPreference.fullWhenWithinSize,
-      bool markAsSeen = false}) async {
+  ///
+  /// Compare [fetchMessagesNextPage]
+  Future<List<MimeMessage>> fetchMessageSequence(
+    MessageSequence sequence, {
+    Mailbox? mailbox,
+    FetchPreference fetchPreference = FetchPreference.fullWhenWithinSize,
+    bool markAsSeen = false,
+  }) async {
     mailbox ??= _selectedMailbox;
     if (mailbox == null) {
       throw InvalidArgumentException(
@@ -579,10 +596,13 @@ class MailClient {
   ///
   /// Optionally specify the [mailbox] in case none has been selected before or
   /// if another mailbox/folder should be queried.
+  ///
   /// Optionally specify the [fetchPreference] to define the preferred
   /// downloaded scope, defaults to `FetchPreference.fullWhenWithinSize`.
+  ///
   /// Set [markAsSeen] to `true` to automatically add the `\Seen` flag in case
   /// it is not there yet when downloading the `fetchPreference.full`.
+  ///
   /// Note that the preference cannot be realized on some backends such as
   /// POP3 mail servers.
   Future<List<MimeMessage>> fetchMessagesNextPage(
@@ -605,12 +625,16 @@ class MailClient {
   /// This can be useful when you have specified an automatic download
   /// limit with `downloadSizeLimit` in the MailClient's constructor or when
   /// you have specified a `fetchPreference` in `fetchMessages`.
+  ///
   /// Optionally specify the [maxSize] in bytes to not download attachments of
   /// the message. The [maxSize] parameter is ignored over POP.
+  ///
   /// Optionally set [markAsSeen] to `true` in case the message should be
   /// flagged as `\Seen` if not already done.
+  ///
   /// Optionally specify [includedInlineTypes] to exclude parts with an inline
   /// disposition and a different media type than specified.
+  ///
   /// Optionally specify a specific [responseTimeout] until when the message
   /// contents must have arrived
   Future<MimeMessage> fetchMessageContents(
@@ -635,9 +659,13 @@ class MailClient {
   /// to download an individual attachment, for example.
   /// Note that this is only possible when the user is connected via IMAP and
   /// not via POP.
+  ///
   /// Compare [lowLevelIncomingMailClientType].
-  Future<MimePart> fetchMessagePart(MimeMessage message, String fetchId,
-          {Duration? responseTimeout}) =>
+  Future<MimePart> fetchMessagePart(
+    MimeMessage message,
+    String fetchId, {
+    Duration? responseTimeout,
+  }) =>
       _incomingMailClient.fetchMessagePart(message, fetchId,
           responseTimeout: responseTimeout);
 
@@ -645,21 +673,26 @@ class MailClient {
   ///
   /// Optionally specify the [mailbox], in case not the currently selected
   /// mailbox should be used.
+  ///
   /// Choose with [threadPreference] if only the latest (default) or all
   /// messages should be fetched.
+  ///
   /// Choose what message data should be fetched using [fetchPreference],
   /// which defaults to [FetchPreference.envelope].
+  ///
   /// Choose the number of downloaded messages with [pageSize], which
   /// defaults to `30`.
+  ///
   /// Note that you can download further pages using [fetchThreadsNextPage].
   /// Compare [supportsThreading].
-  Future<ThreadResult> fetchThreads(
-      {required DateTime since,
-      Mailbox? mailbox,
-      ThreadPreference threadPreference = ThreadPreference.latest,
-      FetchPreference fetchPreference = FetchPreference.envelope,
-      int pageSize = 30,
-      Duration? responseTimeout}) {
+  Future<ThreadResult> fetchThreads({
+    required DateTime since,
+    Mailbox? mailbox,
+    ThreadPreference threadPreference = ThreadPreference.latest,
+    FetchPreference fetchPreference = FetchPreference.envelope,
+    int pageSize = 30,
+    Duration? responseTimeout,
+  }) {
     mailbox ??= _selectedMailbox;
     if (mailbox == null) {
       throw InvalidArgumentException('no mailbox defined nor selected');
@@ -673,9 +706,11 @@ class MailClient {
   /// and returns the loaded messages.
   ///
   /// The given [threadResult] will be updated to contain the loaded messages.
+  ///
   /// Compare [fetchThreads].
   Future<List<MimeMessage>> fetchThreadsNextPage(
-      ThreadResult threadResult) async {
+    ThreadResult threadResult,
+  ) async {
     final messages = await fetchMessagesNextPage(threadResult.threadSequence,
         fetchPreference: threadResult.fetchPreference);
     threadResult.addAll(messages);
@@ -708,7 +743,8 @@ class MailClient {
   /// Builds the mime message from the given [messageBuilder]
   /// with the recommended text encodings.
   Future<MimeMessage?> buildMimeMessageWithRecommendedTextEncoding(
-      MessageBuilder messageBuilder) async {
+    MessageBuilder messageBuilder,
+  ) async {
     final supports8Bit = await supports8BitEncoding();
     messageBuilder.setRecommendedTextEncoding(
       supports8BitMessages: supports8Bit,
@@ -721,13 +757,16 @@ class MailClient {
   ///
   /// Specify [from] as the originator in case it differs from the
   /// `From` header of the message.
+  ///
   /// Optionally set [appendToSent] to `false` in case the message should
   /// NOT be appended to the SENT folder.
   /// By default the message is appended. Note that some mail providers
   /// automatically append sent messages to
   /// the SENT folder, this is not detected by this API.
+  ///
   /// Optionally specify the [recipients], in which case the recipients
   /// defined in the message are ignored.
+  ///
   /// Optionally specify the [sentMailbox] when the mail system does not
   /// support mailbox flags.
   Future<dynamic> sendMessageBuilder(
@@ -763,18 +802,23 @@ class MailClient {
 
   /// Sends the specified [message].
   ///
-  /// Use `MessageBuilder` to create new messages.
+  /// Use [MessageBuilder] to create new messages.
+  ///
   /// Specify [from] as the originator in case it differs from the `From`
   /// header of the message.
+  ///
   /// Optionally set [appendToSent] to `false` in case the message should NOT
   /// be appended to the SENT folder.
   /// By default the message is appended. Note that some mail providers
   /// automatically append sent messages to
   /// the SENT folder, this is not detected by this API.
+  ///
   /// You can also specify if the message should be sent using 8 bit encoding
   /// with [use8BitEncoding], which default to `false`.
+  ///
   /// Optionally specify the [recipients], in which case the recipients
   /// defined in the message are ignored.
+  ///
   /// Optionally specify the [sentMailbox] when the mail system does not
   /// support mailbox flags.
   Future<void> sendMessage(
@@ -896,8 +940,8 @@ class MailClient {
   /// Determines if message flags such as `\Seen` can be stored.
   ///
   /// POP3 servers do not support message flagging, for example.
-  /// Note that even on POP3 servers the \Deleted "flag" can be set. However,
-  /// messages are really deleted
+  /// Note that even on POP3 servers the \Deleted / [MessageFlags.deleted]
+  /// "flag" can be set. However, messages are really deleted
   /// and cannot be retrieved after marking them as deleted after the current
   /// POP3 session is closed.
   bool supportsFlagging() => _incomingMailClient.supportsFlagging();
@@ -910,8 +954,10 @@ class MailClient {
   /// the `CONDSTORE` or `QRESYNC` capability
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markSeen(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markSeen(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.seen],
           unchangedSinceModSequence: unchangedSinceModSequence);
 
@@ -920,11 +966,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markUnseen(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markUnseen(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.seen],
           action: StoreAction.remove,
           unchangedSinceModSequence: unchangedSinceModSequence);
@@ -934,11 +983,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markFlagged(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markFlagged(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.flagged],
           unchangedSinceModSequence: unchangedSinceModSequence);
 
@@ -947,11 +999,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markUnflagged(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markUnflagged(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.flagged],
           action: StoreAction.remove,
           unchangedSinceModSequence: unchangedSinceModSequence);
@@ -961,11 +1016,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markDeleted(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markDeleted(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.deleted],
           unchangedSinceModSequence: unchangedSinceModSequence);
 
@@ -974,11 +1032,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markUndeleted(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markUndeleted(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.deleted],
           action: StoreAction.remove,
           unchangedSinceModSequence: unchangedSinceModSequence);
@@ -988,11 +1049,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markAnswered(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markAnswered(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.answered],
           unchangedSinceModSequence: unchangedSinceModSequence);
 
@@ -1001,11 +1065,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markUnanswered(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markUnanswered(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.answered],
           action: StoreAction.remove,
           unchangedSinceModSequence: unchangedSinceModSequence);
@@ -1016,11 +1083,15 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markForwarded(MessageSequence sequence,
-          {bool? silent, int? unchangedSinceModSequence}) =>
+  Future<void> markForwarded(
+    MessageSequence sequence, {
+    bool? silent,
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.keywordForwarded],
           unchangedSinceModSequence: unchangedSinceModSequence);
 
@@ -1030,11 +1101,14 @@ class MailClient {
   /// Specify the [unchangedSinceModSequence] to limit the store action to
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports
-  /// the `CONDSTORE` or `QRESYNC` capability
+  /// the `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Compare the [store] method in case you need more control or want to
   /// change several flags.
-  Future<void> markUnforwarded(MessageSequence sequence,
-          {int? unchangedSinceModSequence}) =>
+  Future<void> markUnforwarded(
+    MessageSequence sequence, {
+    int? unchangedSinceModSequence,
+  }) =>
       store(sequence, [MessageFlags.keywordForwarded],
           action: StoreAction.remove,
           unchangedSinceModSequence: unchangedSinceModSequence);
@@ -1094,11 +1168,15 @@ class MailClient {
   /// elements that have not changed since the specified modification sequence.
   /// This is only supported when the server supports the
   /// `CONDSTORE` or `QRESYNC` capability.
+  ///
   /// Call [supportsFlagging] first to determine if the mail server supports
   /// flagging at all.
-  Future<void> store(MessageSequence sequence, List<String> flags,
-          {StoreAction action = StoreAction.add,
-          int? unchangedSinceModSequence}) =>
+  Future<void> store(
+    MessageSequence sequence,
+    List<String> flags, {
+    StoreAction action = StoreAction.add,
+    int? unchangedSinceModSequence,
+  }) =>
       _incomingMailClient.store(
           sequence, flags, action, unchangedSinceModSequence);
 
@@ -1110,10 +1188,14 @@ class MailClient {
   /// Optionally set [expunge] to `true` to clear the messages directly from
   /// disk on IMAP servers. In that case, the delete operation cannot be undone.
   ///
-  /// Returns a `DeleteResult` that can be used for an undo operation,
+  /// Returns a [DeleteResult] that can be used for an undo operation,
   /// compare [undoDeleteMessages].
-  Future<DeleteResult> deleteMessage(MimeMessage message,
-          {bool expunge = false}) =>
+  ///
+  /// The UID of the [message] will be updated automatically.
+  Future<DeleteResult> deleteMessage(
+    MimeMessage message, {
+    bool expunge = false,
+  }) =>
       deleteMessages(MessageSequence.fromMessage(message), expunge: expunge);
 
   /// Deletes the given message [sequence].
@@ -1126,18 +1208,31 @@ class MailClient {
   ///
   /// Returns a `DeleteResult` that can be used for an undo operation,
   /// compare [undoDeleteMessages].
+  ///
+  /// The UIDs of the [messages] will be updated automatically, when they
+  /// are specified.
   Future<DeleteResult> deleteMessages(
     MessageSequence sequence, {
     bool expunge = false,
+    List<MimeMessage>? messages,
   }) {
     final trashMailbox = getMailbox(MailboxFlag.trash);
-    return _incomingMailClient.deleteMessages(sequence, trashMailbox,
-        expunge: expunge);
+    return _incomingMailClient.deleteMessages(
+      sequence,
+      trashMailbox,
+      expunge: expunge,
+      messages: messages,
+    );
   }
 
   /// Reverts the previous [deleteResult]
   ///
-  /// Note that is only possible when `deleteResult.isUndoable` is `true`.
+  /// Note that is only possible when `deleteResult.canUndo` is `true`.
+  ///
+  /// The UIDs of the associated messages will be updated automatically,
+  /// when the messages have been specified in the original delete operation.
+  ///
+  /// Compare [deleteMessages]
   Future<DeleteResult> undoDeleteMessages(DeleteResult deleteResult) =>
       _incomingMailClient.undoDeleteMessages(deleteResult);
 
@@ -1160,48 +1255,87 @@ class MailClient {
   }
 
   /// Moves the specified [message] to the junk folder
+  ///
+  /// The message UID will be updated automatically.
   Future<MoveResult> junkMessage(MimeMessage message) =>
       moveMessageToFlag(message, MailboxFlag.junk);
 
   /// Moves the specified message [sequence] to the junk folder
-  Future<MoveResult> junkMessages(MessageSequence sequence) =>
-      moveMessagesToFlag(sequence, MailboxFlag.junk);
+  ///
+  /// The message UID will be updated automatically.
+  Future<MoveResult> junkMessages(
+    MessageSequence sequence, {
+    List<MimeMessage>? messages,
+  }) =>
+      moveMessagesToFlag(sequence, MailboxFlag.junk, messages: messages);
 
   /// Moves the specified [message] to the inbox folder
+  ///
+  /// The message UID will be updated automatically.
   Future<MoveResult> moveMessageToInbox(MimeMessage message) =>
       moveMessageToFlag(message, MailboxFlag.inbox);
 
   /// Moves the specified message [sequence] to the inbox folder
-  Future<MoveResult> moveMessagesToInbox(MessageSequence sequence) =>
-      moveMessagesToFlag(sequence, MailboxFlag.inbox);
+  ///
+  /// The message UID will be updated automatically.
+  Future<MoveResult> moveMessagesToInbox(
+    MessageSequence sequence, {
+    List<MimeMessage>? messages,
+  }) =>
+      moveMessagesToFlag(sequence, MailboxFlag.inbox, messages: messages);
 
   /// Moves the specified [message] to the folder flagged
   /// with the specified mailbox [flag].
+  ///
+  /// The message UID will be updated automatically.
   Future<MoveResult> moveMessageToFlag(MimeMessage message, MailboxFlag flag) =>
-      moveMessagesToFlag(MessageSequence.fromMessage(message), flag);
+      moveMessagesToFlag(
+        MessageSequence.fromMessage(message),
+        flag,
+        messages: [message],
+      );
 
   /// Moves the specified message [sequence] to the folder flagged
   /// with the specified mailbox [flag].
+  ///
+  /// The [messages] UIDs will be updated automatically when they are specified.
   Future<MoveResult> moveMessagesToFlag(
-      MessageSequence sequence, MailboxFlag flag) {
+    MessageSequence sequence,
+    MailboxFlag flag, {
+    List<MimeMessage>? messages,
+  }) {
     final target = getMailbox(flag);
     if (target == null) {
       throw InvalidArgumentException(
           'Move target mailbox with flag $flag not found');
     }
-    return _incomingMailClient.moveMessages(sequence, target);
+    return _incomingMailClient.moveMessages(sequence, target,
+        messages: messages);
   }
 
   /// Moves the specified [message] to the given [target] folder
+  ///
+  /// The message UID will be updated automatically.
   Future<MoveResult> moveMessage(MimeMessage message, Mailbox target) =>
       _incomingMailClient.moveMessages(
-          MessageSequence.fromMessage(message), target);
+          MessageSequence.fromMessage(message), target,
+          messages: [message]);
 
   /// Moves the specified message [sequence] to the given [target] folder
-  Future<MoveResult> moveMessages(MessageSequence sequence, Mailbox target) =>
-      _incomingMailClient.moveMessages(sequence, target);
+  ///
+  /// The [messages] UIDs will be updated automatically when they are specified.
+  Future<MoveResult> moveMessages(
+    MessageSequence sequence,
+    Mailbox target, {
+    List<MimeMessage>? messages,
+  }) =>
+      _incomingMailClient.moveMessages(sequence, target, messages: messages);
 
   /// Reverts the previous move operation, if possible.
+  ///
+  /// When messages have been specified for the original [moveMessages]
+  /// operation, then the UIDs of those messages will be adjusted
+  /// automatically.
   Future<MoveResult> undoMoveMessages(MoveResult moveResult) =>
       _incomingMailClient.undoMove(moveResult);
 
@@ -1296,20 +1430,12 @@ abstract class _IncomingMailClient {
 
   Future<void> connect();
 
-  Future disconnect();
+  Future<void> disconnect();
 
   Future<List<Mailbox>> listMailboxes();
 
   Future<Mailbox> selectMailbox(Mailbox mailbox,
       {bool enableCondStore = false, QResyncParameters? qresync});
-
-  Future<List<MimeMessage>> fetchMessages({
-    required Mailbox mailbox,
-    required FetchPreference fetchPreference,
-    int count = 20,
-    int page = 1,
-    Duration? responseTimeout,
-  });
 
   Future<ThreadResult> fetchThreads(
     Mailbox mailbox,
@@ -1349,8 +1475,11 @@ abstract class _IncomingMailClient {
       StoreAction action, int? unchangedSinceModSequence);
 
   Future<DeleteResult> deleteMessages(
-      MessageSequence sequence, Mailbox? trashMailbox,
-      {bool expunge = false});
+    MessageSequence sequence,
+    Mailbox? trashMailbox, {
+    bool expunge = false,
+    List<MimeMessage>? messages,
+  });
 
   Future<DeleteResult> undoDeleteMessages(DeleteResult deleteResult);
 
@@ -1380,7 +1509,11 @@ abstract class _IncomingMailClient {
     }
   }
 
-  Future<MoveResult> moveMessages(MessageSequence sequence, Mailbox target);
+  Future<MoveResult> moveMessages(
+    MessageSequence sequence,
+    Mailbox target, {
+    List<MimeMessage>? messages,
+  });
 
   Future<MoveResult> undoMove(MoveResult moveResult);
 
@@ -1694,14 +1827,14 @@ class _IncomingImapClient extends _IncomingMailClient {
     } catch (e, s) {
       throw MailException(mailClient, e.toString(), stackTrace: s, details: e);
     }
-    if (_imapClient.serverInfo.capabilities?.isEmpty ?? true) {
+    final serverInfo = _imapClient.serverInfo;
+    if (serverInfo.capabilities?.isEmpty ?? true) {
       await _imapClient.capability();
     }
-    if (_imapClient.serverInfo.supportsId) {
+    if (serverInfo.supportsId) {
       _serverId = await _imapClient.id(clientId: mailClient.clientId);
     }
-    _config.serverCapabilities = _imapClient.serverInfo.capabilities;
-    final serverInfo = _imapClient.serverInfo;
+    _config.serverCapabilities = serverInfo.capabilities;
     final enableCaps = <String>[];
     if (serverInfo.supportsQresync) {
       enableCaps.add(ImapServerInfo.capabilityQresync);
@@ -1718,7 +1851,10 @@ class _IncomingImapClient extends _IncomingMailClient {
   }
 
   @override
-  Future disconnect() => _imapClient.disconnect();
+  Future<void> disconnect() {
+    _reconnectCounter++; // this aborts the reconnect cycle
+    return _imapClient.disconnect();
+  }
 
   @override
   Future<List<Mailbox>> listMailboxes() async {
@@ -1760,32 +1896,6 @@ class _IncomingImapClient extends _IncomingMailClient {
     } finally {
       await _resumeIdle();
     }
-  }
-
-  @override
-  Future<List<MimeMessage>> fetchMessages({
-    required Mailbox mailbox,
-    required FetchPreference fetchPreference,
-    int count = 20,
-    int page = 1,
-    Duration? responseTimeout,
-  }) {
-    if (mailbox.messagesExists == 0) {
-      // should the mailbox status be updated first?
-      return Future.value(<MimeMessage>[]);
-    }
-    var end = mailbox.messagesExists;
-    end -= (page - 1) * count;
-    if (end < 1) {
-      end = 1;
-    }
-    var start = end - count;
-    if (start < 1) {
-      start = 1;
-    }
-    final sequence = MessageSequence.fromRange(start, end);
-    return fetchMessageSequence(sequence,
-        fetchPreference: fetchPreference, responseTimeout: responseTimeout);
   }
 
   @override
@@ -2180,8 +2290,11 @@ class _IncomingImapClient extends _IncomingMailClient {
 
   @override
   Future<DeleteResult> deleteMessages(
-      MessageSequence sequence, Mailbox? trashMailbox,
-      {bool expunge = false}) async {
+    MessageSequence sequence,
+    Mailbox? trashMailbox, {
+    bool expunge = false,
+    List<MimeMessage>? messages,
+  }) async {
     final selectedMailbox = _selectedMailbox;
     if (selectedMailbox == null) {
       throw MailException(
@@ -2197,9 +2310,16 @@ class _IncomingImapClient extends _IncomingMailClient {
           await _imapClient.expunge();
         }
         final canUndo = !expunge;
-        return DeleteResult(DeleteAction.flag, sequence, selectedMailbox,
-            sequence, selectedMailbox, mailClient,
-            canUndo: canUndo);
+        return DeleteResult(
+          DeleteAction.flag,
+          sequence,
+          selectedMailbox,
+          sequence,
+          selectedMailbox,
+          mailClient,
+          canUndo: canUndo,
+          messages: messages,
+        );
       } on ImapException catch (e) {
         throw MailException.fromImap(mailClient, e);
       } finally {
@@ -2246,6 +2366,7 @@ class _IncomingImapClient extends _IncomingMailClient {
           trashMailbox,
           mailClient,
           canUndo: targetSequence != null,
+          messages: messages,
         );
       } on ImapException catch (e) {
         selectedMailbox.messagesExists += sequence.length;
@@ -2369,10 +2490,18 @@ class _IncomingImapClient extends _IncomingMailClient {
   }
 
   Future<MoveResult> _moveMessages(
-      MessageSequence? sequence, Mailbox? target) async {
+    MessageSequence? sequence,
+    Mailbox? target, {
+    List<MimeMessage>? messages,
+  }) async {
+    final sourceMailbox = _selectedMailbox;
+    if (sourceMailbox == null) {
+      throw MailException(
+          mailClient, 'Unable to move messages without selected mailbox');
+    }
     MoveAction moveAction;
     GenericImapResult imapResult;
-    if (_imapClient.serverInfo.supports('MOVE')) {
+    if (_imapClient.serverInfo.supports(ImapServerInfo.capabilityMove)) {
       moveAction = MoveAction.move;
       if (sequence!.isUidSequence) {
         imapResult = await _imapClient.uidMove(sequence, targetMailbox: target);
@@ -2387,24 +2516,41 @@ class _IncomingImapClient extends _IncomingMailClient {
       } else {
         imapResult = await _imapClient.copy(sequence, targetMailbox: target);
       }
-      await _imapClient.store(sequence, [MessageFlags.deleted],
-          action: StoreAction.add);
+      await _imapClient.store(
+        sequence,
+        [MessageFlags.deleted],
+        action: StoreAction.add,
+      );
     }
     _selectedMailbox?.messagesExists -= sequence.length;
     final targetSequence = imapResult.responseCodeCopyUid?.targetSequence;
     // copy and move commands result in a mapping sequence
     // which is relevant for undo operations:
-    return MoveResult(moveAction, sequence, _selectedMailbox, targetSequence,
-        target, mailClient,
-        canUndo: targetSequence != null);
+    return MoveResult(
+      moveAction,
+      sequence,
+      sourceMailbox,
+      targetSequence,
+      target,
+      mailClient,
+      canUndo: targetSequence != null,
+      messages: messages,
+    );
   }
 
   @override
   Future<MoveResult> moveMessages(
-      MessageSequence sequence, Mailbox target) async {
+    MessageSequence sequence,
+    Mailbox target, {
+    List<MimeMessage>? messages,
+  }) async {
     try {
       await _pauseIdle();
-      final response = await _moveMessages(sequence, target);
+      final response = await _moveMessages(
+        sequence,
+        target,
+        messages: messages,
+      );
       return response;
     } on ImapException catch (e) {
       throw MailException.fromImap(mailClient, e);
@@ -2419,8 +2565,11 @@ class _IncomingImapClient extends _IncomingMailClient {
       await _pauseIdle();
       await _imapClient.selectMailbox(moveResult.targetMailbox!);
       final response = await _moveMessages(
-          moveResult.targetSequence, moveResult.originalMailbox);
-      await _imapClient.selectMailbox(moveResult.originalMailbox!);
+        moveResult.targetSequence,
+        moveResult.originalMailbox,
+        messages: moveResult.messages,
+      );
+      await _imapClient.selectMailbox(moveResult.originalMailbox);
       return response;
     } on ImapException catch (e) {
       throw MailException.fromImap(mailClient, e);
@@ -2644,7 +2793,6 @@ class _IncomingPopClient extends _IncomingMailClient {
   @override
   ServerType get clientType => ServerType.pop;
 
-  List<MessageListing>? _popMessageListing;
   final Mailbox _popInbox = Mailbox(
     encodedName: 'Inbox',
     encodedPath: 'Inbox',
@@ -2682,7 +2830,7 @@ class _IncomingPopClient extends _IncomingMailClient {
   }
 
   @override
-  Future disconnect() => _popClient.disconnect();
+  Future<void> disconnect() => _popClient.disconnect();
 
   @override
   Future<List<Mailbox>> listMailboxes() {
@@ -2700,33 +2848,6 @@ class _IncomingPopClient extends _IncomingMailClient {
     mailbox.messagesExists = status.numberOfMessages;
     _selectedMailbox = mailbox;
     return mailbox;
-  }
-
-  @override
-  Future<List<MimeMessage>> fetchMessages({
-    required Mailbox mailbox,
-    required FetchPreference fetchPreference,
-    int count = 20,
-    int page = 1,
-    Duration? responseTimeout,
-  }) async {
-    _popMessageListing ??= await _popClient.list();
-    var listings = _popMessageListing;
-    var startIndex = listings!.length - count;
-    startIndex -= page * count;
-    var usedCount = count;
-    if (startIndex < 0) {
-      usedCount += startIndex;
-      startIndex = 0;
-    }
-    listings = listings.sublist(startIndex, startIndex + usedCount);
-    final messages = <MimeMessage>[];
-    for (final listing in listings) {
-      //TODO check listing.sizeInBytes
-      final message = await _popClient.retrieve(listing.id);
-      messages.add(message);
-    }
-    return messages;
   }
 
   @override
@@ -2802,15 +2923,18 @@ class _IncomingPopClient extends _IncomingMailClient {
     List<MediaToptype>? includedInlineTypes,
     Duration? responseTimeout,
   }) async {
-    final id = message.sequenceId;
+    final id = message.sequenceId!;
     final messageResponse = await _popClient.retrieve(id);
     return messageResponse;
   }
 
   @override
   Future<DeleteResult> deleteMessages(
-      MessageSequence sequence, Mailbox? trashMailbox,
-      {bool expunge = false}) async {
+    MessageSequence sequence,
+    Mailbox? trashMailbox, {
+    bool expunge = false,
+    List<MimeMessage>? messages,
+  }) async {
     final selectedMailbox = _selectedMailbox;
     if (selectedMailbox == null) {
       throw MailException(
@@ -2821,8 +2945,15 @@ class _IncomingPopClient extends _IncomingMailClient {
       await _popClient.delete(id);
     }
     return DeleteResult(
-        DeleteAction.pop, sequence, selectedMailbox, null, null, mailClient,
-        canUndo: false);
+      DeleteAction.pop,
+      sequence,
+      selectedMailbox,
+      null,
+      null,
+      mailClient,
+      canUndo: false,
+      messages: messages,
+    );
   }
 
   @override
@@ -2839,7 +2970,11 @@ class _IncomingPopClient extends _IncomingMailClient {
   }
 
   @override
-  Future<MoveResult> moveMessages(MessageSequence sequence, Mailbox target) {
+  Future<MoveResult> moveMessages(
+    MessageSequence sequence,
+    Mailbox target, {
+    List<MimeMessage>? messages,
+  }) {
     // TODO: implement moveMessages
     throw UnimplementedError();
   }
