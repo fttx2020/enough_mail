@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:enough_convert/enough_convert.dart';
 import 'package:event_bus/event_bus.dart';
-
 import '../mime_message.dart';
 import '../private/pop/commands/all_commands.dart';
 import '../private/pop/parsers/pop_standard_parser.dart';
@@ -60,7 +60,7 @@ class PopClient extends ClientBase {
   EventBus get eventBus => _eventBus;
   final EventBus _eventBus;
 
-  final GbkDecoder _gbkDecoder = GbkDecoder(allowInvalid: true);
+  final GbkDecoder _gbkDecoder = const GbkDecoder(allowInvalid: true);
 
   final Uint8ListReader _uint8listReader = Uint8ListReader();
   PopCommand? _currentCommand;
@@ -89,10 +89,11 @@ class PopClient extends ClientBase {
   @override
   void onDataReceived(Uint8List data) {
     _uint8listReader.add(data);
-    if (_currentFirstResponseLine == null) {
-      _currentFirstResponseLine = _uint8listReader.readLine();
-      if (_currentFirstResponseLine != null &&
-          _currentFirstResponseLine!.startsWith('-ERR')) {
+    _currentFirstResponseLine = _uint8listReader.readLine();
+    final currentLine = _currentFirstResponseLine;
+    if (currentLine == null) {
+      if (currentLine != null &&
+          currentLine!.startsWith('-ERR')) {
         ///check decoder
         final _text = _gbkDecoder.convert(data);
         final _lines = _text.trim().split('\r\n');

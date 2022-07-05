@@ -1774,7 +1774,7 @@ class ContentDispositionHeader extends ParameterizedHeader {
             : disposition == ContentDisposition.attachment
                 ? 'attachment'
                 : 'unsupported') {
-    dispositionText = disposition.name;
+    dispositionText = disposition.toString().split('.').last;
   }
 
   /// Convenience method to create a `Content-Disposition: inline` header

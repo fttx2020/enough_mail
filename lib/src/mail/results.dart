@@ -568,7 +568,7 @@ class PagedMessageResult {
     final request = _requestedPages[pageIndex] ?? queue(pageIndex);
     final messages = await request;
     if (_requestedPages.containsKey(pageIndex)) {
-      unawaited(_requestedPages.remove(pageIndex));
+      _requestedPages.remove(pageIndex);
       insertAll(messages);
     }
     final relativeIndex =
