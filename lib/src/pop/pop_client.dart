@@ -91,16 +91,14 @@ class PopClient extends ClientBase {
     _uint8listReader.add(data);
     _currentFirstResponseLine = _uint8listReader.readLine();
     final currentLine = _currentFirstResponseLine;
-    if (currentLine == null) {
-      if (currentLine != null &&
-          currentLine!.startsWith('-ERR')) {
-        ///check decoder
-        final _text = _gbkDecoder.convert(data);
-        final _lines = _text.trim().split('\r\n');
-        onServerResponse(_lines);
-        // onServerResponse([_currentFirstResponseLine]);
-        return;
-      }
+    if (currentLine != null &&
+        currentLine.startsWith('-ERR')) {
+      ///check decoder
+      final _text = _gbkDecoder.convert(data);
+      final _lines = _text.trim().split('\r\n');
+      onServerResponse(_lines);
+      // onServerResponse([_currentFirstResponseLine]);
+      return;
     }
     if (_currentCommand?.isMultiLine ?? false) {
       final lines = _uint8listReader.readLinesToCrLfDotCrLfSequence();
