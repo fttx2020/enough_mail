@@ -45,6 +45,11 @@ abstract class MailCodec {
 
   /// ASCII encoding
   static const encodingAscii = convert.AsciiCodec(allowInvalid: true);
+
+  ///charsetCodecsByName
+  static Map<String, convert.Encoding Function()> get charsetCodecsByName =>
+      _charsetCodecsByName;
+
   static final _charsetCodecsByName = <String, convert.Encoding Function()>{
     'utf-8': () => encodingUtf8,
     'utf8': () => encodingUtf8,
