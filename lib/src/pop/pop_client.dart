@@ -89,27 +89,28 @@ class PopClient extends ClientBase {
   @override
   void onDataReceived(Uint8List data) {
     _uint8listReader.add(data);
-    _currentFirstResponseLine = _uint8listReader.readLine();
-    final currentLine = _currentFirstResponseLine;
-    if (currentLine != null &&
-        currentLine.startsWith('-ERR')) {
-      ///check decoder
-      final _text = _gbkDecoder.convert(data);
-      final _lines = _text.trim().split('\r\n');
-      onServerResponse(_lines);
-      // onServerResponse([_currentFirstResponseLine]);
-      return;
+    if (_currentFirstResponseLine == null) {
+      _currentFirstResponseLine = _uint8listReader.readLine();
+      if (_currentFirstResponseLine != null &&
+          _currentFirstResponseLine!.trim().startsWith('-ERR')) {
+        ///check decoder
+        final _text = _gbkDecoder.convert(data);
+        final _lines = _text.trim().split('\r\n');
+        onServerResponse(_lines);
+        // onServerResponse([_currentFirstResponseLine]);
+        return;
+      }
     }
     if (_currentCommand?.isMultiLine ?? false) {
       final lines = _uint8listReader.readLinesToCrLfDotCrLfSequence();
       if (lines != null) {
-        if (currentLine != null) {
-          lines.insert(0, currentLine);
+        if (_currentFirstResponseLine != null) {
+          lines.insert(0, _currentFirstResponseLine!);
         }
         onServerResponse(lines);
       }
-    } else if (currentLine != null) {
-      onServerResponse([currentLine]);
+    } else if (_currentFirstResponseLine != null) {
+      onServerResponse([_currentFirstResponseLine!]);
     }
   }
 
