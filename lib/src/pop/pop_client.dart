@@ -88,6 +88,12 @@ class PopClient extends ClientBase {
 
   @override
   void onDataReceived(Uint8List data) {
+    var _start = _uint8listReader.length;
+    if (_start >= 4) {
+      _start -= 4;
+    } else {
+      _start = 0;
+    }
     _uint8listReader.add(data);
     if (_currentFirstResponseLine == null) {
       _currentFirstResponseLine = _uint8listReader.readLine();
@@ -102,7 +108,9 @@ class PopClient extends ClientBase {
       }
     }
     if (_currentCommand?.isMultiLine ?? false) {
-      final lines = _uint8listReader.readLinesToCrLfDotCrLfSequence();
+      final lines = _uint8listReader.readLinesToCrLfDotCrLfSequence(
+          start: _start,
+      );
       if (lines != null) {
         if (_currentFirstResponseLine != null) {
           lines.insert(0, _currentFirstResponseLine!);

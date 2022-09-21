@@ -46,8 +46,8 @@ class Uint8ListReader {
   }
 
   /// Finds the last CR-LF.CR-LF sequence
-  int? findLastCrLfDotCrLfSequence() {
-    for (var charIndex = _builder.length; --charIndex > 4;) {
+  int? findLastCrLfDotCrLfSequence({int start = 0}) {
+    for (var charIndex = _builder.length; --charIndex > start + 4;) {
       if (_builder.getByteAt(charIndex) == 10 &&
           _builder.getByteAt(charIndex - 1) == 13 &&
           _builder.getByteAt(charIndex - 2) == AsciiRunes.runeDot &&
@@ -61,8 +61,8 @@ class Uint8ListReader {
   }
 
   /// Reads all data until a CT-LF.CT-LF
-  List<String>? readLinesToCrLfDotCrLfSequence() {
-    final pos = findLastCrLfDotCrLfSequence();
+  List<String>? readLinesToCrLfDotCrLfSequence({int start = 0}) {
+    final pos = findLastCrLfDotCrLfSequence(start: start);
     if (pos == null) {
       return null;
     }
@@ -81,6 +81,9 @@ class Uint8ListReader {
 
   /// Checks if the given [length] of data is available
   bool isAvailable(int length) => length <= _builder.length;
+
+  /// data length
+  int get length => _builder.length;
 }
 
 /// A non-copying [BytesBuilder].
